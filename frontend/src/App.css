@@ -1,0 +1,46 @@
+.page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+h1 {
+  margin: 0;
+  font-size: 3.5rem;
+  letter-spacing: -0.04em;
+}
+
+.tagline {
+  margin: 12px 0 0;
+  font-size: 1.2rem;
+  color: #334155;
+}
+
+.status {
+  margin: 24px 0 0;
+  max-width: 28rem;
+  color: #64748b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .eyebrow,
+  .status {
+    color: #94a3b8;
+  }
+
+  .tagline {
+    color: #cbd5e1;
+  }
+}
