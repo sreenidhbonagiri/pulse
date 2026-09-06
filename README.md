@@ -21,4 +21,8 @@ cd backend
 go run ./cmd/api
 ```
 
-Then visit [http://localhost:8080](http://localhost:8080).
+Then test the health endpoint:
+
+```bash
+curl http://localhost:8080/health
+```
