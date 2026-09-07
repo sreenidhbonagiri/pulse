@@ -11,11 +11,12 @@ import (
 )
 
 type Server struct {
-	addr      string
-	monitors  repository.MonitorRepository
-	incidents *service.IncidentService
-	checks    *service.MonitorCheckService
-	stats     *service.MonitorStatsService
+	addr        string
+	corsOrigins string
+	monitors    repository.MonitorRepository
+	incidents   *service.IncidentService
+	checks      *service.MonitorCheckService
+	stats       *service.MonitorStatsService
 }
 
 func NewServer(
@@ -31,16 +32,17 @@ func NewServer(
 	checks := service.NewMonitorCheckService(monitors, checkResults, nil, publisher, incidentSvc)
 	checks.SetStatsCache(statsCache)
 	return &Server{
-		addr:      cfg.Addr,
-		monitors:  monitors,
-		incidents: incidentSvc,
-		checks:    checks,
-		stats:     service.NewMonitorStatsService(monitors, checkResults, incidents, statsCache),
+		addr:        cfg.Addr,
+		corsOrigins: cfg.CORSOrigins,
+		monitors:    monitors,
+		incidents:   incidentSvc,
+		checks:      checks,
+		stats:       service.NewMonitorStatsService(monitors, checkResults, incidents, statsCache),
 	}
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.routes()
+	return corsMiddleware(s.corsOrigins, s.routes())
 }
 
 func (s *Server) Start() error {

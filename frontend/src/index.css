@@ -1,28 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560&family=Outfit:wght@400;500;600&display=swap');
+
 :root {
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --bg: #f3efe6;
+  --paper: #fffcf7;
+  --ink: #1a1714;
+  --muted: #6b645c;
+  --line: #e4dcd0;
+  --accent: #0b6e63;
+  --accent-soft: #d7efe9;
+  --up: #1f7a4d;
+  --down: #b42318;
+  --unknown: #7a7268;
+  --incident: #9a3412;
+  --shadow: 0 16px 40px rgba(26, 23, 20, 0.08);
+  font-family: Outfit, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
   line-height: 1.5;
-  font-weight: 400;
-  color: #0f172a;
-  background-color: #f8fafc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f8fafc;
-    background-color: #0f172a;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 body {
   margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
 }
 
-#root {
-  min-height: 100vh;
+h1,
+h2,
+h3,
+.brand-name {
+  font-family: Fraunces, Georgia, serif;
+  letter-spacing: -0.03em;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select {
+  font: inherit;
 }

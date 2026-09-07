@@ -1,14 +1,21 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Layout } from './components/Layout'
+import { DashboardPage } from './pages/Dashboard'
+import { MonitorDetailPage } from './pages/MonitorDetail'
+import { NewMonitorPage } from './pages/NewMonitor'
 import './App.css'
 
-function App() {
+export default function App() {
   return (
-    <main className="page">
-      <p className="eyebrow">Portfolio project</p>
-      <h1>Pulse</h1>
-      <p className="tagline">Uptime and API monitoring platform</p>
-      <p className="status">The frontend starter is running. The dashboard will be built here later.</p>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="monitors/new" element={<NewMonitorPage />} />
+          <Route path="monitors/:id" element={<MonitorDetailPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   )
 }
-
-export default App

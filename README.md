@@ -18,11 +18,22 @@ Redis is used only to cache monitor statistics. The API still works if Redis is 
 
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Open [http://localhost:5173](http://localhost:5173). The dashboard talks to the API using `VITE_API_BASE_URL` (default `http://localhost:8080`).
+
+**Run frontend and backend together**
+
+1. Start Postgres, RabbitMQ, and Redis: `docker compose up -d`
+2. Start the API: `cd backend && go run ./cmd/api`
+3. Start the worker and scheduler in other terminals (`go run ./cmd/worker`, `go run ./cmd/scheduler`) so checks actually run
+4. Start the dashboard: `cd frontend && npm run dev`
+5. Open [http://localhost:5173](http://localhost:5173)
+
+The API allows those browser origins through `CORS_ORIGINS` (default `http://localhost:5173,http://127.0.0.1:5173`). Restart the API after changing that variable.
 
 **Backend** (requires [Go](https://go.dev/doc/install), PostgreSQL, and RabbitMQ. Redis is optional.)
 

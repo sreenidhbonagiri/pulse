@@ -12,6 +12,7 @@ type Config struct {
 	DatabaseURL string
 	RabbitMQURL string
 	RedisURL    string
+	CORSOrigins string
 }
 
 func Load() Config {
@@ -24,6 +25,7 @@ func Load() Config {
 		DatabaseURL: env("DATABASE_URL", "postgres://pulse:pulse@localhost:5432/pulse?sslmode=disable"),
 		RabbitMQURL: env("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
 		RedisURL:    env("REDIS_URL", "redis://localhost:6379/0"),
+		CORSOrigins: env("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"),
 	}
 }
 
