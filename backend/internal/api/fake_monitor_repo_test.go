@@ -29,6 +29,9 @@ func (f *fakeMonitorRepo) Create(_ context.Context, monitor *models.Monitor) err
 	now := time.Now().UTC()
 	monitor.CreatedAt = now
 	monitor.UpdatedAt = now
+	if monitor.NextCheckAt == nil {
+		monitor.NextCheckAt = &now
+	}
 	f.monitors[monitor.ID] = *monitor
 	return nil
 }
@@ -48,6 +51,36 @@ func (f *fakeMonitorRepo) List(_ context.Context) ([]models.Monitor, error) {
 		monitors = append(monitors, monitor)
 	}
 	return monitors, nil
+}
+
+func (f *fakeMonitorRepo) ListDue(_ context.Context, now time.Time, limit int) ([]models.Monitor, error) {
+	due := make([]models.Monitor, 0)
+	for _, monitor := range f.monitors {
+		if monitor.IsActive && monitor.NextCheckAt != nil && !monitor.NextCheckAt.After(now) {
+			due = append(due, monitor)
+		}
+	}
+	if limit <= 0 || limit > len(due) {
+		return due, nil
+	}
+	return due[:limit], nil
+}
+
+func (f *fakeMonitorRepo) ClaimDue(ctx context.Context, now time.Time, enqueue func(models.Monitor) error) (*models.Monitor, error) {
+	due, err := f.ListDue(ctx, now, 1)
+	if err != nil || len(due) == 0 {
+		return nil, err
+	}
+	monitor := due[0]
+	if err := enqueue(monitor); err != nil {
+		return &monitor, err
+	}
+	next := repository.NextCheckTime(now, monitor.CheckIntervalSeconds)
+	stored := f.monitors[monitor.ID]
+	stored.NextCheckAt = &next
+	f.monitors[monitor.ID] = stored
+	monitor.NextCheckAt = &next
+	return &monitor, nil
 }
 
 func (f *fakeMonitorRepo) Update(_ context.Context, monitor *models.Monitor) error {

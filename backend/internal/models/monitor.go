@@ -17,6 +17,7 @@ type Monitor struct {
 	TimeoutSeconds       int        `json:"timeout_seconds"`
 	ExpectedStatusCode   int        `json:"expected_status_code"`
 	IsActive             bool       `json:"is_active"`
+	NextCheckAt          *time.Time `json:"next_check_at"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }

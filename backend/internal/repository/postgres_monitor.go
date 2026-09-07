@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -11,7 +12,7 @@ import (
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 )
 
-const monitorColumns = `id, user_id, name, url, http_method, check_interval_seconds, timeout_seconds, expected_status_code, is_active, created_at, updated_at`
+const monitorColumns = `id, user_id, name, url, http_method, check_interval_seconds, timeout_seconds, expected_status_code, is_active, next_check_at, created_at, updated_at`
 
 type PostgresMonitorRepository struct {
 	pool *pgxpool.Pool
@@ -25,13 +26,17 @@ func (r *PostgresMonitorRepository) Create(ctx context.Context, monitor *models.
 	if monitor.ID == uuid.Nil {
 		monitor.ID = uuid.New()
 	}
+	if monitor.NextCheckAt == nil {
+		now := time.Now().UTC()
+		monitor.NextCheckAt = &now
+	}
 
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO monitors (
 			id, user_id, name, url, http_method,
-			check_interval_seconds, timeout_seconds, expected_status_code, is_active
+			check_interval_seconds, timeout_seconds, expected_status_code, is_active, next_check_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING `+monitorColumns,
 		monitor.ID,
 		monitor.UserID,
@@ -42,6 +47,7 @@ func (r *PostgresMonitorRepository) Create(ctx context.Context, monitor *models.
 		monitor.TimeoutSeconds,
 		monitor.ExpectedStatusCode,
 		monitor.IsActive,
+		monitor.NextCheckAt,
 	)
 
 	scanned, err := scanMonitor(row)
@@ -77,20 +83,69 @@ func (r *PostgresMonitorRepository) List(ctx context.Context) ([]models.Monitor,
 		return nil, err
 	}
 	defer rows.Close()
+	return collectMonitors(rows)
+}
 
-	monitors := make([]models.Monitor, 0)
-	for rows.Next() {
-		monitor, err := scanMonitor(rows)
-		if err != nil {
-			return nil, err
-		}
-		monitors = append(monitors, *monitor)
+func (r *PostgresMonitorRepository) ListDue(ctx context.Context, now time.Time, limit int) ([]models.Monitor, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+monitorColumns+`
+		FROM monitors
+		WHERE is_active = TRUE
+		  AND next_check_at IS NOT NULL
+		  AND next_check_at <= $1
+		ORDER BY next_check_at ASC
+		LIMIT $2
+	`, now, clampDueLimit(limit))
+	if err != nil {
+		return nil, err
 	}
-	if err := rows.Err(); err != nil {
+	defer rows.Close()
+	return collectMonitors(rows)
+}
+
+func (r *PostgresMonitorRepository) ClaimDue(ctx context.Context, now time.Time, enqueue func(models.Monitor) error) (*models.Monitor, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	monitor, err := scanMonitor(tx.QueryRow(ctx, `
+		SELECT `+monitorColumns+`
+		FROM monitors
+		WHERE is_active = TRUE
+		  AND next_check_at IS NOT NULL
+		  AND next_check_at <= $1
+		ORDER BY next_check_at ASC
+		LIMIT 1
+		FOR UPDATE SKIP LOCKED
+	`, now))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
 		return nil, err
 	}
 
-	return monitors, nil
+	if err := enqueue(*monitor); err != nil {
+		return monitor, err
+	}
+
+	next := NextCheckTime(time.Now().UTC(), monitor.CheckIntervalSeconds)
+	if _, err := tx.Exec(ctx, `
+		UPDATE monitors
+		SET next_check_at = $2, updated_at = NOW()
+		WHERE id = $1
+	`, monitor.ID, next); err != nil {
+		return monitor, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return monitor, err
+	}
+
+	monitor.NextCheckAt = &next
+	return monitor, nil
 }
 
 func (r *PostgresMonitorRepository) Update(ctx context.Context, monitor *models.Monitor) error {
@@ -105,6 +160,7 @@ func (r *PostgresMonitorRepository) Update(ctx context.Context, monitor *models.
 			timeout_seconds = $7,
 			expected_status_code = $8,
 			is_active = $9,
+			next_check_at = $10,
 			updated_at = NOW()
 		WHERE id = $1
 		RETURNING `+monitorColumns,
@@ -117,6 +173,7 @@ func (r *PostgresMonitorRepository) Update(ctx context.Context, monitor *models.
 		monitor.TimeoutSeconds,
 		monitor.ExpectedStatusCode,
 		monitor.IsActive,
+		monitor.NextCheckAt,
 	)
 
 	scanned, err := scanMonitor(row)
@@ -145,6 +202,21 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
+func collectMonitors(rows pgx.Rows) ([]models.Monitor, error) {
+	monitors := make([]models.Monitor, 0)
+	for rows.Next() {
+		monitor, err := scanMonitor(rows)
+		if err != nil {
+			return nil, err
+		}
+		monitors = append(monitors, *monitor)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return monitors, nil
+}
+
 func scanMonitor(row scanner) (*models.Monitor, error) {
 	var monitor models.Monitor
 	err := row.Scan(
@@ -157,6 +229,7 @@ func scanMonitor(row scanner) (*models.Monitor, error) {
 		&monitor.TimeoutSeconds,
 		&monitor.ExpectedStatusCode,
 		&monitor.IsActive,
+		&monitor.NextCheckAt,
 		&monitor.CreatedAt,
 		&monitor.UpdatedAt,
 	)

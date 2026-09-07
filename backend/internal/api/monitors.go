@@ -122,6 +122,7 @@ func applyMonitorUpdate(existing *models.Monitor, req monitorRequest) *models.Mo
 	updated := req.toMonitor()
 	updated.ID = existing.ID
 	updated.UserID = existing.UserID
+	updated.NextCheckAt = existing.NextCheckAt
 	if req.IsActive == nil {
 		updated.IsActive = existing.IsActive
 	}

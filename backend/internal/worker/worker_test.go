@@ -136,6 +136,14 @@ func (m *memoryMonitors) GetByID(_ context.Context, id uuid.UUID) (*models.Monit
 
 func (m *memoryMonitors) List(_ context.Context) ([]models.Monitor, error) { return nil, nil }
 
+func (m *memoryMonitors) ListDue(_ context.Context, _ time.Time, _ int) ([]models.Monitor, error) {
+	return nil, nil
+}
+
+func (m *memoryMonitors) ClaimDue(_ context.Context, _ time.Time, _ func(models.Monitor) error) (*models.Monitor, error) {
+	return nil, nil
+}
+
 func (m *memoryMonitors) Update(_ context.Context, monitor *models.Monitor) error {
 	m.monitors[monitor.ID] = *monitor
 	return nil

@@ -39,6 +39,13 @@ cd backend
 go run ./cmd/worker
 ```
 
+Scheduler (separate terminal):
+
+```bash
+cd backend
+go run ./cmd/scheduler
+```
+
 Health check:
 
 ```bash
