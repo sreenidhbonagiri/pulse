@@ -12,6 +12,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/monitors/{id}", s.getMonitor)
 	mux.HandleFunc("PUT /api/monitors/{id}", s.updateMonitor)
 	mux.HandleFunc("DELETE /api/monitors/{id}", s.deleteMonitor)
+	mux.HandleFunc("POST /api/monitors/{id}/check", s.checkMonitor)
+	mux.HandleFunc("GET /api/monitors/{id}/checks", s.listMonitorChecks)
 
 	return mux
 }

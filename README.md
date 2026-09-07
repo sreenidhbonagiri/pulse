@@ -43,3 +43,10 @@ curl -X POST http://localhost:8080/api/monitors \
 
 curl http://localhost:8080/api/monitors
 ```
+
+**Manual check** (temporary endpoint)
+
+```bash
+curl -X POST http://localhost:8080/api/monitors/MONITOR_ID/check
+curl http://localhost:8080/api/monitors/MONITOR_ID/checks
+```
