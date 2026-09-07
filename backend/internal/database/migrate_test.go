@@ -29,4 +29,7 @@ func TestListUpMigrationsIsOrdered(t *testing.T) {
 	if len(entries) < 3 || path.Base(entries[2]) != "000003_add_monitors_next_check_at.up.sql" {
 		t.Fatalf("third migration = %q", entries)
 	}
+	if len(entries) < 4 || path.Base(entries[3]) != "000004_add_check_results_job_id.up.sql" {
+		t.Fatalf("fourth migration = %q", entries)
+	}
 }

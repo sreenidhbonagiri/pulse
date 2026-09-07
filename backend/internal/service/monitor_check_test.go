@@ -25,7 +25,8 @@ func TestRunCheckSuccess(t *testing.T) {
 	results := newMemoryCheckResults()
 	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, checker, nil)
 
-	got, err := svc.RunCheck(context.Background(), monitor.ID)
+	jobID := uuid.New()
+	got, err := svc.RunCheck(context.Background(), monitor.ID, jobID)
 	if err != nil {
 		t.Fatalf("RunCheck: %v", err)
 	}
@@ -34,6 +35,9 @@ func TestRunCheckSuccess(t *testing.T) {
 	}
 	if got.MonitorID != monitor.ID {
 		t.Fatalf("monitor_id = %s", got.MonitorID)
+	}
+	if got.JobID != jobID {
+		t.Fatalf("job_id = %s, want %s", got.JobID, jobID)
 	}
 	if got.ID == uuid.Nil {
 		t.Fatal("expected saved result id")
@@ -46,9 +50,37 @@ func TestRunCheckSuccess(t *testing.T) {
 func TestRunCheckUnknownMonitor(t *testing.T) {
 	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{}, nil)
 
-	_, err := svc.RunCheck(context.Background(), uuid.New())
+	_, err := svc.RunCheck(context.Background(), uuid.New(), uuid.New())
 	if !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestRunCheckDuplicateJobID(t *testing.T) {
+	monitor := storedMonitor()
+	status := 200
+	results := newMemoryCheckResults()
+	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, stubChecker{result: models.CheckResult{
+		StatusCode:     &status,
+		ResponseTimeMs: 12,
+		Success:        true,
+	}}, nil)
+	jobID := uuid.New()
+
+	if _, err := svc.RunCheck(context.Background(), monitor.ID, jobID); err != nil {
+		t.Fatalf("first RunCheck: %v", err)
+	}
+	_, err := svc.RunCheck(context.Background(), monitor.ID, jobID)
+	if !errors.Is(err, repository.ErrDuplicate) {
+		t.Fatalf("err = %v, want ErrDuplicate", err)
+	}
+
+	listed, err := results.ListByMonitorID(context.Background(), monitor.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 1 {
+		t.Fatalf("len = %d, want 1 unique CheckResult", len(listed))
 	}
 }
 
@@ -182,6 +214,13 @@ func newMemoryCheckResults() *memoryCheckResults {
 func (m *memoryCheckResults) Create(_ context.Context, result *models.CheckResult) error {
 	if result.ID == uuid.Nil {
 		result.ID = uuid.New()
+	}
+	if result.JobID != uuid.Nil {
+		for _, existing := range m.results {
+			if existing.JobID == result.JobID {
+				return repository.ErrDuplicate
+			}
+		}
 	}
 	m.results[result.ID] = *result
 	return nil

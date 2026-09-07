@@ -28,6 +28,13 @@ func (f *fakeCheckResultRepo) Create(_ context.Context, result *models.CheckResu
 	if result.CheckedAt.IsZero() {
 		result.CheckedAt = time.Now().UTC()
 	}
+	if result.JobID != uuid.Nil {
+		for _, existing := range f.results {
+			if existing.JobID == result.JobID {
+				return repository.ErrDuplicate
+			}
+		}
+	}
 	f.results[result.ID] = *result
 	return nil
 }

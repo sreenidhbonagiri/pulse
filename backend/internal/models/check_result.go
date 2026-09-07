@@ -9,6 +9,7 @@ import (
 // CheckResult is the outcome of one HTTP health check against a Monitor.
 type CheckResult struct {
 	ID             uuid.UUID `json:"id"`
+	JobID          uuid.UUID `json:"job_id,omitempty"`
 	MonitorID      uuid.UUID `json:"monitor_id"`
 	StatusCode     *int      `json:"status_code"`
 	ResponseTimeMs int       `json:"response_time_ms"`

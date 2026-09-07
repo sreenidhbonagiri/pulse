@@ -27,17 +27,10 @@ func Dial(url string) (*RabbitMQ, error) {
 		return nil, fmt.Errorf("open rabbitmq channel: %w", err)
 	}
 
-	if _, err := ch.QueueDeclare(
-		MonitorChecksQueue,
-		true,  // durable: survive broker restarts
-		false, // autoDelete
-		false, // exclusive
-		false, // noWait
-		nil,
-	); err != nil {
+	if err := declareTopology(ch); err != nil {
 		_ = ch.Close()
 		_ = conn.Close()
-		return nil, fmt.Errorf("declare queue %s: %w", MonitorChecksQueue, err)
+		return nil, err
 	}
 
 	if err := ch.Qos(1, 0, false); err != nil {
@@ -50,24 +43,7 @@ func Dial(url string) (*RabbitMQ, error) {
 }
 
 func (r *RabbitMQ) Publish(ctx context.Context, job MonitorCheckJob) error {
-	body, err := EncodeJob(job)
-	if err != nil {
-		return fmt.Errorf("encode job: %w", err)
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	err = r.ch.PublishWithContext(ctx, "", MonitorChecksQueue, false, false, amqp.Publishing{
-		ContentType:  "application/json",
-		DeliveryMode: amqp.Persistent,
-		MessageId:    job.JobID.String(),
-		Body:         body,
-	})
-	if err != nil {
-		return fmt.Errorf("publish job %s: %w", job.JobID, err)
-	}
-	return nil
+	return r.publishTo(ctx, MonitorChecksQueue, job)
 }
 
 func (r *RabbitMQ) Consume(ctx context.Context, handler JobHandler) error {
@@ -91,11 +67,46 @@ func (r *RabbitMQ) Consume(ctx context.Context, handler JobHandler) error {
 
 func (r *RabbitMQ) handleOne(ctx context.Context, delivery amqp.Delivery, handler JobHandler) {
 	decision := HandleDelivery(ctx, delivery.Body, handler)
+
+	if decision.RetryJob != nil {
+		if err := r.publishTo(ctx, decision.RetryKey, *decision.RetryJob); err != nil {
+			_ = delivery.Nack(false, true)
+			return
+		}
+	}
+	if decision.DeadLetter != nil {
+		if err := r.publishTo(ctx, DeadLetterQueue, *decision.DeadLetter); err != nil {
+			_ = delivery.Nack(false, true)
+			return
+		}
+	}
+
 	if decision.Ack {
 		_ = delivery.Ack(false)
 		return
 	}
 	_ = delivery.Nack(false, decision.Requeue)
+}
+
+func (r *RabbitMQ) publishTo(ctx context.Context, routingKey string, job MonitorCheckJob) error {
+	body, err := EncodeJob(job)
+	if err != nil {
+		return fmt.Errorf("encode job: %w", err)
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	err = r.ch.PublishWithContext(ctx, JobsExchange, routingKey, false, false, amqp.Publishing{
+		ContentType:  "application/json",
+		DeliveryMode: amqp.Persistent,
+		MessageId:    job.JobID.String(),
+		Body:         body,
+	})
+	if err != nil {
+		return fmt.Errorf("publish job %s to %s: %w", job.JobID, routingKey, err)
+	}
+	return nil
 }
 
 func (r *RabbitMQ) Close() error {

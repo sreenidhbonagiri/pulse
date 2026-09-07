@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -49,6 +50,9 @@ func TestHandleJobSavesCheckResult(t *testing.T) {
 	if len(listed) != 1 || !listed[0].Success {
 		t.Fatalf("saved results = %+v", listed)
 	}
+	if listed[0].JobID != job.JobID {
+		t.Fatalf("job_id = %s, want %s", listed[0].JobID, job.JobID)
+	}
 }
 
 func TestHandleJobFailedHTTPStatusStillSaves(t *testing.T) {
@@ -95,6 +99,77 @@ func TestHandleJobUnknownMonitorDoesNotFail(t *testing.T) {
 	err := New(svc).HandleJob(context.Background(), queue.NewMonitorCheckJob(uuid.New()))
 	if err != nil {
 		t.Fatalf("HandleJob: %v, want nil so the message can be acked", err)
+	}
+}
+
+func TestHandleJobDuplicateDeliveryAcksWithoutSecondRow(t *testing.T) {
+	monitor := models.Monitor{
+		ID:                 uuid.New(),
+		Name:               "test",
+		URL:                "https://example.com/health",
+		HTTPMethod:         "GET",
+		TimeoutSeconds:     2,
+		ExpectedStatusCode: 200,
+		IsActive:           true,
+	}
+	status := 200
+	results := newMemoryCheckResults()
+	svc := service.NewMonitorCheckService(
+		newMemoryMonitors(monitor),
+		results,
+		stubChecker{result: models.CheckResult{
+			StatusCode:     &status,
+			ResponseTimeMs: 15,
+			Success:        true,
+			CheckedAt:      time.Now().UTC(),
+		}},
+		nil,
+	)
+
+	job := queue.NewMonitorCheckJob(monitor.ID)
+	worker := New(svc)
+	if err := worker.HandleJob(context.Background(), job); err != nil {
+		t.Fatalf("first HandleJob: %v", err)
+	}
+	if err := worker.HandleJob(context.Background(), job); err != nil {
+		t.Fatalf("duplicate HandleJob: %v, want nil so the message can be acked", err)
+	}
+
+	listed, err := results.ListByMonitorID(context.Background(), monitor.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 1 {
+		t.Fatalf("len = %d, want 1 CheckResult after duplicate delivery", len(listed))
+	}
+}
+
+func TestHandleJobInternalFailureIsRetryable(t *testing.T) {
+	monitor := models.Monitor{
+		ID:                 uuid.New(),
+		Name:               "test",
+		URL:                "https://example.com/health",
+		HTTPMethod:         "GET",
+		TimeoutSeconds:     2,
+		ExpectedStatusCode: 200,
+		IsActive:           true,
+	}
+	status := 200
+	svc := service.NewMonitorCheckService(
+		newMemoryMonitors(monitor),
+		failingCheckResults{err: errors.New("postgres unavailable")},
+		stubChecker{result: models.CheckResult{
+			StatusCode:     &status,
+			ResponseTimeMs: 15,
+			Success:        true,
+			CheckedAt:      time.Now().UTC(),
+		}},
+		nil,
+	)
+
+	err := New(svc).HandleJob(context.Background(), queue.NewMonitorCheckJob(monitor.ID))
+	if err == nil {
+		t.Fatal("expected an internal error so the job can be retried")
 	}
 }
 
@@ -166,6 +241,13 @@ func (m *memoryCheckResults) Create(_ context.Context, result *models.CheckResul
 	if result.ID == uuid.Nil {
 		result.ID = uuid.New()
 	}
+	if result.JobID != uuid.Nil {
+		for _, existing := range m.results {
+			if existing.JobID == result.JobID {
+				return repository.ErrDuplicate
+			}
+		}
+	}
 	m.results[result.ID] = *result
 	return nil
 }
@@ -190,4 +272,20 @@ func (m *memoryCheckResults) ListByMonitorID(_ context.Context, monitorID uuid.U
 		return listed, nil
 	}
 	return listed[:limit], nil
+}
+
+type failingCheckResults struct {
+	err error
+}
+
+func (f failingCheckResults) Create(_ context.Context, _ *models.CheckResult) error {
+	return f.err
+}
+
+func (f failingCheckResults) GetByID(_ context.Context, _ uuid.UUID) (*models.CheckResult, error) {
+	return nil, repository.ErrNotFound
+}
+
+func (f failingCheckResults) ListByMonitorID(_ context.Context, _ uuid.UUID, _ int) ([]models.CheckResult, error) {
+	return nil, nil
 }

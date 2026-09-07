@@ -7,12 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 )
 
-const checkResultColumns = `id, monitor_id, status_code, response_time_ms, success, error_message, checked_at`
+const checkResultColumns = `id, job_id, monitor_id, status_code, response_time_ms, success, error_message, checked_at`
 
 type PostgresCheckResultRepository struct {
 	pool *pgxpool.Pool
@@ -32,11 +33,12 @@ func (r *PostgresCheckResultRepository) Create(ctx context.Context, result *mode
 
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO check_results (
-			id, monitor_id, status_code, response_time_ms, success, error_message, checked_at
+			id, job_id, monitor_id, status_code, response_time_ms, success, error_message, checked_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING `+checkResultColumns,
 		result.ID,
+		nullableUUID(result.JobID),
 		result.MonitorID,
 		result.StatusCode,
 		result.ResponseTimeMs,
@@ -47,7 +49,7 @@ func (r *PostgresCheckResultRepository) Create(ctx context.Context, result *mode
 
 	scanned, err := scanCheckResult(row)
 	if err != nil {
-		return err
+		return mapCheckResultWriteError(err)
 	}
 	*result = *scanned
 	return nil
@@ -98,8 +100,10 @@ func (r *PostgresCheckResultRepository) ListByMonitorID(ctx context.Context, mon
 
 func scanCheckResult(row scanner) (*models.CheckResult, error) {
 	var result models.CheckResult
+	var jobID *uuid.UUID
 	err := row.Scan(
 		&result.ID,
+		&jobID,
 		&result.MonitorID,
 		&result.StatusCode,
 		&result.ResponseTimeMs,
@@ -110,5 +114,23 @@ func scanCheckResult(row scanner) (*models.CheckResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	if jobID != nil {
+		result.JobID = *jobID
+	}
 	return &result, nil
+}
+
+func nullableUUID(id uuid.UUID) any {
+	if id == uuid.Nil {
+		return nil
+	}
+	return id
+}
+
+func mapCheckResultWriteError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return ErrDuplicate
+	}
+	return err
 }

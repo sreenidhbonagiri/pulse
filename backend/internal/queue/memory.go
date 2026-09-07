@@ -9,7 +9,9 @@ type MemoryPublisher struct {
 }
 
 func NewMemoryPublisher() *MemoryPublisher {
-	return &MemoryPublisher{Jobs: make([]MonitorCheckJob, 0)}
+	return &MemoryPublisher{
+		Jobs: make([]MonitorCheckJob, 0),
+	}
 }
 
 func (m *MemoryPublisher) Publish(_ context.Context, job MonitorCheckJob) error {

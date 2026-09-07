@@ -49,13 +49,14 @@ func (s *MonitorCheckService) EnqueueCheck(ctx context.Context, monitorID uuid.U
 	return &job, nil
 }
 
-func (s *MonitorCheckService) RunCheck(ctx context.Context, monitorID uuid.UUID) (*models.CheckResult, error) {
+func (s *MonitorCheckService) RunCheck(ctx context.Context, monitorID, jobID uuid.UUID) (*models.CheckResult, error) {
 	monitor, err := s.monitors.GetByID(ctx, monitorID)
 	if err != nil {
 		return nil, err
 	}
 
 	result := s.checker.Check(ctx, *monitor)
+	result.JobID = jobID
 	if err := s.checkResults.Create(ctx, &result); err != nil {
 		return nil, err
 	}

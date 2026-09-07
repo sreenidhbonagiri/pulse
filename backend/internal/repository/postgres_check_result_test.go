@@ -60,6 +60,49 @@ func TestPostgresCheckResultRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("duplicate job_id is rejected", func(t *testing.T) {
+		jobID := uuid.New()
+		status := 200
+		first := &models.CheckResult{
+			JobID:          jobID,
+			MonitorID:      monitor.ID,
+			StatusCode:     &status,
+			ResponseTimeMs: 10,
+			Success:        true,
+			CheckedAt:      time.Now().UTC(),
+		}
+		if err := results.Create(ctx, first); err != nil {
+			t.Fatalf("create: %v", err)
+		}
+
+		second := &models.CheckResult{
+			JobID:          jobID,
+			MonitorID:      monitor.ID,
+			StatusCode:     &status,
+			ResponseTimeMs: 11,
+			Success:        true,
+			CheckedAt:      time.Now().UTC(),
+		}
+		err := results.Create(ctx, second)
+		if !errors.Is(err, ErrDuplicate) {
+			t.Fatalf("err = %v, want ErrDuplicate", err)
+		}
+
+		listed, err := results.ListByMonitorID(ctx, monitor.ID, 100)
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		matches := 0
+		for _, item := range listed {
+			if item.JobID == jobID {
+				matches++
+			}
+		}
+		if matches != 1 {
+			t.Fatalf("job_id rows = %d, want 1", matches)
+		}
+	})
+
 	t.Run("get missing result", func(t *testing.T) {
 		_, err := results.GetByID(ctx, uuid.New())
 		if !errors.Is(err, ErrNotFound) {

@@ -8,8 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const MonitorChecksQueue = "monitor.checks"
-
 // MonitorCheckJob is a request to run one health check in the background.
 type MonitorCheckJob struct {
 	JobID       uuid.UUID `json:"job_id"`

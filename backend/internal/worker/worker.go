@@ -21,12 +21,17 @@ func New(checks *service.MonitorCheckService) *Worker {
 }
 
 func (w *Worker) HandleJob(ctx context.Context, job queue.MonitorCheckJob) error {
-	result, err := w.checks.RunCheck(ctx, job.MonitorID)
+	result, err := w.checks.RunCheck(ctx, job.MonitorID, job.JobID)
 	if errors.Is(err, repository.ErrNotFound) {
-		log.Printf("job_id=%s monitor_id=%s skipped: monitor not found", job.JobID, job.MonitorID)
+		log.Printf("job_id=%s monitor_id=%s attempt=%d skipped: monitor not found", job.JobID, job.MonitorID, job.Attempt)
+		return nil
+	}
+	if errors.Is(err, repository.ErrDuplicate) {
+		log.Printf("job_id=%s monitor_id=%s attempt=%d skipped: duplicate check result", job.JobID, job.MonitorID, job.Attempt)
 		return nil
 	}
 	if err != nil {
+		log.Printf("job_id=%s monitor_id=%s attempt=%d error=%v", job.JobID, job.MonitorID, job.Attempt, err)
 		return err
 	}
 
@@ -36,9 +41,10 @@ func (w *Worker) HandleJob(ctx context.Context, job queue.MonitorCheckJob) error
 	}
 
 	log.Printf(
-		"job_id=%s monitor_id=%s status_code=%s response_time_ms=%d success=%t",
+		"job_id=%s monitor_id=%s attempt=%d status_code=%s response_time_ms=%d success=%t",
 		job.JobID,
 		job.MonitorID,
+		job.Attempt,
 		statusCode,
 		result.ResponseTimeMs,
 		result.Success,

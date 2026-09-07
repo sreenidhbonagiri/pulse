@@ -11,6 +11,7 @@ import (
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrDuplicate = errors.New("duplicate")
 
 const (
 	defaultDueLimit = 50
