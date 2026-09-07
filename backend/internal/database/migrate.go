@@ -107,7 +107,8 @@ func applyMigration(ctx context.Context, pool *pgxpool.Pool, filename string) er
 	}
 
 	log.Printf("applying migration %s", base)
-	if _, err := tx.Exec(ctx, string(sqlBytes)); err != nil {
+	// Migration files may contain more than one SQL statement (table + indexes).
+	if err := tx.Conn().PgConn().Exec(ctx, string(sqlBytes)).Close(); err != nil {
 		return fmt.Errorf("apply migration %s: %w", base, err)
 	}
 

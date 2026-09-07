@@ -151,7 +151,7 @@ func TestDeleteMonitor(t *testing.T) {
 }
 
 func newTestHandler() http.Handler {
-	return NewServer(config.Config{}, newFakeMonitorRepo()).Handler()
+	return NewServer(config.Config{}, newFakeMonitorRepo(), nil).Handler()
 }
 
 func doRequest(t *testing.T, handler http.Handler, method, path, body string) *httptest.ResponseRecorder {

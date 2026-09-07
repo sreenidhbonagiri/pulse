@@ -8,14 +8,16 @@ import (
 )
 
 type Server struct {
-	addr     string
-	monitors repository.MonitorRepository
+	addr         string
+	monitors     repository.MonitorRepository
+	checkResults repository.CheckResultRepository
 }
 
-func NewServer(cfg config.Config, monitors repository.MonitorRepository) *Server {
+func NewServer(cfg config.Config, monitors repository.MonitorRepository, checkResults repository.CheckResultRepository) *Server {
 	return &Server{
-		addr:     cfg.Addr,
-		monitors: monitors,
+		addr:         cfg.Addr,
+		monitors:     monitors,
+		checkResults: checkResults,
 	}
 }
 
