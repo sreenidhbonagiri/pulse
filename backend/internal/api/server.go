@@ -10,21 +10,25 @@ import (
 )
 
 type Server struct {
-	addr     string
-	monitors repository.MonitorRepository
-	checks   *service.MonitorCheckService
+	addr      string
+	monitors  repository.MonitorRepository
+	incidents *service.IncidentService
+	checks    *service.MonitorCheckService
 }
 
 func NewServer(
 	cfg config.Config,
 	monitors repository.MonitorRepository,
 	checkResults repository.CheckResultRepository,
+	incidents repository.IncidentRepository,
 	publisher queue.Publisher,
 ) *Server {
+	incidentSvc := service.NewIncidentService(checkResults, incidents, repository.NewMemoryTransactor())
 	return &Server{
-		addr:     cfg.Addr,
-		monitors: monitors,
-		checks:   service.NewMonitorCheckService(monitors, checkResults, nil, publisher),
+		addr:      cfg.Addr,
+		monitors:  monitors,
+		incidents: incidentSvc,
+		checks:    service.NewMonitorCheckService(monitors, checkResults, nil, publisher, incidentSvc),
 	}
 }
 

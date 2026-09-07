@@ -37,11 +37,18 @@ func main() {
 	}
 	defer rmq.Close()
 
+	checkResults := repository.NewPostgresCheckResultRepository(pool)
+	incidents := service.NewIncidentService(
+		checkResults,
+		repository.NewPostgresIncidentRepository(pool),
+		repository.NewPostgresTransactor(pool),
+	)
 	checks := service.NewMonitorCheckService(
 		repository.NewPostgresMonitorRepository(pool),
-		repository.NewPostgresCheckResultRepository(pool),
+		checkResults,
 		monitoring.NewChecker(nil),
 		nil,
+		incidents,
 	)
 
 	log.Printf("Pulse worker listening on queue %s", queue.MonitorChecksQueue)

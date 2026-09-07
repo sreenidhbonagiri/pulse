@@ -66,8 +66,14 @@ curl http://localhost:8080/api/monitors
 
 ```bash
 curl -X POST http://localhost:8080/api/monitors/MONITOR_ID/check
-curl http://localhost:8080/api/monitors/MONITOR_ID/checks
+curl -s http://localhost:8080/api/monitors/MONITOR_ID/checks
+curl -s http://localhost:8080/api/monitors/MONITOR_ID/incidents
+curl -s http://localhost:8080/api/monitors/MONITOR_ID/incidents/active
 ```
+
+## Incidents
+
+Pulse opens an incident after **3 consecutive failed checks** and resolves it after **2 consecutive successful checks**. Endpoint failures such as HTTP 500 count as failed checks. Internal Pulse errors still retry and do not open incidents by themselves.
 
 ## Tests
 

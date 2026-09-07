@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
@@ -23,6 +22,10 @@ func NewPostgresCheckResultRepository(pool *pgxpool.Pool) *PostgresCheckResultRe
 	return &PostgresCheckResultRepository{pool: pool}
 }
 
+func (r *PostgresCheckResultRepository) q(ctx context.Context) querier {
+	return querierFrom(ctx, r.pool)
+}
+
 func (r *PostgresCheckResultRepository) Create(ctx context.Context, result *models.CheckResult) error {
 	if result.ID == uuid.Nil {
 		result.ID = uuid.New()
@@ -31,7 +34,7 @@ func (r *PostgresCheckResultRepository) Create(ctx context.Context, result *mode
 		result.CheckedAt = time.Now().UTC()
 	}
 
-	row := r.pool.QueryRow(ctx, `
+	row := r.q(ctx).QueryRow(ctx, `
 		INSERT INTO check_results (
 			id, job_id, monitor_id, status_code, response_time_ms, success, error_message, checked_at
 		)
@@ -49,14 +52,14 @@ func (r *PostgresCheckResultRepository) Create(ctx context.Context, result *mode
 
 	scanned, err := scanCheckResult(row)
 	if err != nil {
-		return mapCheckResultWriteError(err)
+		return mapUniqueViolation(err)
 	}
 	*result = *scanned
 	return nil
 }
 
 func (r *PostgresCheckResultRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.CheckResult, error) {
-	result, err := scanCheckResult(r.pool.QueryRow(ctx, `
+	result, err := scanCheckResult(r.q(ctx).QueryRow(ctx, `
 		SELECT `+checkResultColumns+`
 		FROM check_results
 		WHERE id = $1
@@ -70,8 +73,23 @@ func (r *PostgresCheckResultRepository) GetByID(ctx context.Context, id uuid.UUI
 	return result, nil
 }
 
+func (r *PostgresCheckResultRepository) GetByJobID(ctx context.Context, jobID uuid.UUID) (*models.CheckResult, error) {
+	result, err := scanCheckResult(r.q(ctx).QueryRow(ctx, `
+		SELECT `+checkResultColumns+`
+		FROM check_results
+		WHERE job_id = $1
+	`, jobID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (r *PostgresCheckResultRepository) ListByMonitorID(ctx context.Context, monitorID uuid.UUID, limit int) ([]models.CheckResult, error) {
-	rows, err := r.pool.Query(ctx, `
+	rows, err := r.q(ctx).Query(ctx, `
 		SELECT `+checkResultColumns+`
 		FROM check_results
 		WHERE monitor_id = $1
@@ -125,12 +143,4 @@ func nullableUUID(id uuid.UUID) any {
 		return nil
 	}
 	return id
-}
-
-func mapCheckResultWriteError(err error) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return ErrDuplicate
-	}
-	return err
 }

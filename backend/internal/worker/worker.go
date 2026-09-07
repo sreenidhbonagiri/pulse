@@ -26,10 +26,6 @@ func (w *Worker) HandleJob(ctx context.Context, job queue.MonitorCheckJob) error
 		log.Printf("job_id=%s monitor_id=%s attempt=%d skipped: monitor not found", job.JobID, job.MonitorID, job.Attempt)
 		return nil
 	}
-	if errors.Is(err, repository.ErrDuplicate) {
-		log.Printf("job_id=%s monitor_id=%s attempt=%d skipped: duplicate check result", job.JobID, job.MonitorID, job.Attempt)
-		return nil
-	}
 	if err != nil {
 		log.Printf("job_id=%s monitor_id=%s attempt=%d error=%v", job.JobID, job.MonitorID, job.Attempt, err)
 		return err

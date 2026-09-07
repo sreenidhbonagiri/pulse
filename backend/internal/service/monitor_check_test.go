@@ -23,7 +23,7 @@ func TestRunCheckSuccess(t *testing.T) {
 		CheckedAt:      time.Now().UTC(),
 	}}
 	results := newMemoryCheckResults()
-	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, checker, nil)
+	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, checker, nil, nil)
 
 	jobID := uuid.New()
 	got, err := svc.RunCheck(context.Background(), monitor.ID, jobID)
@@ -48,7 +48,7 @@ func TestRunCheckSuccess(t *testing.T) {
 }
 
 func TestRunCheckUnknownMonitor(t *testing.T) {
-	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{}, nil)
+	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{}, nil, nil)
 
 	_, err := svc.RunCheck(context.Background(), uuid.New(), uuid.New())
 	if !errors.Is(err, repository.ErrNotFound) {
@@ -64,15 +64,14 @@ func TestRunCheckDuplicateJobID(t *testing.T) {
 		StatusCode:     &status,
 		ResponseTimeMs: 12,
 		Success:        true,
-	}}, nil)
+	}}, nil, nil)
 	jobID := uuid.New()
 
 	if _, err := svc.RunCheck(context.Background(), monitor.ID, jobID); err != nil {
 		t.Fatalf("first RunCheck: %v", err)
 	}
-	_, err := svc.RunCheck(context.Background(), monitor.ID, jobID)
-	if !errors.Is(err, repository.ErrDuplicate) {
-		t.Fatalf("err = %v, want ErrDuplicate", err)
+	if _, err := svc.RunCheck(context.Background(), monitor.ID, jobID); err != nil {
+		t.Fatalf("duplicate RunCheck: %v", err)
 	}
 
 	listed, err := results.ListByMonitorID(context.Background(), monitor.ID, 10)
@@ -87,7 +86,7 @@ func TestRunCheckDuplicateJobID(t *testing.T) {
 func TestListChecksNewestFirst(t *testing.T) {
 	monitor := storedMonitor()
 	results := newMemoryCheckResults()
-	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, stubChecker{}, nil)
+	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, stubChecker{}, nil, nil)
 
 	older := models.CheckResult{MonitorID: monitor.ID, ResponseTimeMs: 1, CheckedAt: time.Now().UTC().Add(-time.Minute)}
 	newer := models.CheckResult{MonitorID: monitor.ID, ResponseTimeMs: 2, CheckedAt: time.Now().UTC()}
@@ -104,7 +103,7 @@ func TestListChecksNewestFirst(t *testing.T) {
 }
 
 func TestListChecksUnknownMonitor(t *testing.T) {
-	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{}, nil)
+	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{}, nil, nil)
 
 	_, err := svc.ListChecks(context.Background(), uuid.New(), 10)
 	if !errors.Is(err, repository.ErrNotFound) {
@@ -115,7 +114,7 @@ func TestListChecksUnknownMonitor(t *testing.T) {
 func TestEnqueueCheck(t *testing.T) {
 	monitor := storedMonitor()
 	publisher := queue.NewMemoryPublisher()
-	svc := NewMonitorCheckService(newMemoryMonitors(monitor), newMemoryCheckResults(), nil, publisher)
+	svc := NewMonitorCheckService(newMemoryMonitors(monitor), newMemoryCheckResults(), nil, publisher, nil)
 
 	job, err := svc.EnqueueCheck(context.Background(), monitor.ID)
 	if err != nil {
@@ -131,7 +130,7 @@ func TestEnqueueCheck(t *testing.T) {
 
 func TestEnqueueCheckUnknownMonitor(t *testing.T) {
 	publisher := queue.NewMemoryPublisher()
-	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), nil, publisher)
+	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), nil, publisher, nil)
 
 	_, err := svc.EnqueueCheck(context.Background(), uuid.New())
 	if !errors.Is(err, repository.ErrNotFound) {
@@ -224,6 +223,16 @@ func (m *memoryCheckResults) Create(_ context.Context, result *models.CheckResul
 	}
 	m.results[result.ID] = *result
 	return nil
+}
+
+func (m *memoryCheckResults) GetByJobID(_ context.Context, jobID uuid.UUID) (*models.CheckResult, error) {
+	for _, result := range m.results {
+		if result.JobID == jobID {
+			copied := result
+			return &copied, nil
+		}
+	}
+	return nil, repository.ErrNotFound
 }
 
 func (m *memoryCheckResults) GetByID(_ context.Context, id uuid.UUID) (*models.CheckResult, error) {

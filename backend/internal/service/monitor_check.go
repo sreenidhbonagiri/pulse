@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -21,6 +22,7 @@ type MonitorCheckService struct {
 	checkResults repository.CheckResultRepository
 	checker      HTTPChecker
 	publisher    queue.Publisher
+	incidents    *IncidentService
 }
 
 func NewMonitorCheckService(
@@ -28,12 +30,14 @@ func NewMonitorCheckService(
 	checkResults repository.CheckResultRepository,
 	checker HTTPChecker,
 	publisher queue.Publisher,
+	incidents *IncidentService,
 ) *MonitorCheckService {
 	return &MonitorCheckService{
 		monitors:     monitors,
 		checkResults: checkResults,
 		checker:      checker,
 		publisher:    publisher,
+		incidents:    incidents,
 	}
 }
 
@@ -57,7 +61,18 @@ func (s *MonitorCheckService) RunCheck(ctx context.Context, monitorID, jobID uui
 
 	result := s.checker.Check(ctx, *monitor)
 	result.JobID = jobID
-	if err := s.checkResults.Create(ctx, &result); err != nil {
+	err = s.checkResults.Create(ctx, &result)
+	if errors.Is(err, repository.ErrDuplicate) {
+		saved, lookupErr := s.checkResults.GetByJobID(ctx, jobID)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		result = *saved
+	} else if err != nil {
+		return nil, err
+	}
+
+	if err := s.incidents.Evaluate(ctx, result); err != nil {
 		return nil, err
 	}
 

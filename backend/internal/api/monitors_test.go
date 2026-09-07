@@ -158,16 +158,19 @@ func newTestHandler() http.Handler {
 type testEnv struct {
 	handler      http.Handler
 	checkResults *fakeCheckResultRepo
+	incidents    *fakeIncidentRepo
 	publisher    *queue.MemoryPublisher
 }
 
 func newTestEnv() testEnv {
 	monitors := newFakeMonitorRepo()
 	checkResults := newFakeCheckResultRepo()
+	incidents := newFakeIncidentRepo()
 	publisher := queue.NewMemoryPublisher()
 	return testEnv{
-		handler:      NewServer(config.Config{}, monitors, checkResults, publisher).Handler(),
+		handler:      NewServer(config.Config{}, monitors, checkResults, incidents, publisher).Handler(),
 		checkResults: checkResults,
+		incidents:    incidents,
 		publisher:    publisher,
 	}
 }

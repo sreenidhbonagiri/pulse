@@ -39,6 +39,16 @@ func (f *fakeCheckResultRepo) Create(_ context.Context, result *models.CheckResu
 	return nil
 }
 
+func (f *fakeCheckResultRepo) GetByJobID(_ context.Context, jobID uuid.UUID) (*models.CheckResult, error) {
+	for _, result := range f.results {
+		if result.JobID == jobID {
+			copied := result
+			return &copied, nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
 func (f *fakeCheckResultRepo) GetByID(_ context.Context, id uuid.UUID) (*models.CheckResult, error) {
 	result, ok := f.results[id]
 	if !ok {

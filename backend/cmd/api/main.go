@@ -33,7 +33,8 @@ func main() {
 
 	monitorRepo := repository.NewPostgresMonitorRepository(pool)
 	checkResultRepo := repository.NewPostgresCheckResultRepository(pool)
-	server := api.NewServer(cfg, monitorRepo, checkResultRepo, rmq)
+	incidentRepo := repository.NewPostgresIncidentRepository(pool)
+	server := api.NewServer(cfg, monitorRepo, checkResultRepo, incidentRepo, rmq)
 
 	log.Printf("starting Pulse API on %s", cfg.Addr)
 	if err := server.Start(); err != nil {

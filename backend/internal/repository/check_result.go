@@ -17,6 +17,7 @@ const (
 type CheckResultRepository interface {
 	Create(ctx context.Context, result *models.CheckResult) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.CheckResult, error)
+	GetByJobID(ctx context.Context, jobID uuid.UUID) (*models.CheckResult, error)
 	ListByMonitorID(ctx context.Context, monitorID uuid.UUID, limit int) ([]models.CheckResult, error)
 }
 

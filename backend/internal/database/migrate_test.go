@@ -32,4 +32,7 @@ func TestListUpMigrationsIsOrdered(t *testing.T) {
 	if len(entries) < 4 || path.Base(entries[3]) != "000004_add_check_results_job_id.up.sql" {
 		t.Fatalf("fourth migration = %q", entries)
 	}
+	if len(entries) < 5 || path.Base(entries[4]) != "000005_create_incidents.up.sql" {
+		t.Fatalf("fifth migration = %q", entries)
+	}
 }
