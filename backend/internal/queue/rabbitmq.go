@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 )
 
 // RabbitMQ publishes and consumes monitor-check jobs.
@@ -18,22 +20,26 @@ type RabbitMQ struct {
 func Dial(url string) (*RabbitMQ, error) {
 	conn, err := amqp.Dial(url)
 	if err != nil {
+		metrics.RabbitMQError()
 		return nil, fmt.Errorf("connect to rabbitmq: %w", err)
 	}
 
 	ch, err := conn.Channel()
 	if err != nil {
+		metrics.RabbitMQError()
 		_ = conn.Close()
 		return nil, fmt.Errorf("open rabbitmq channel: %w", err)
 	}
 
 	if err := declareTopology(ch); err != nil {
+		metrics.RabbitMQError()
 		_ = ch.Close()
 		_ = conn.Close()
 		return nil, err
 	}
 
 	if err := ch.Qos(1, 0, false); err != nil {
+		metrics.RabbitMQError()
 		_ = ch.Close()
 		_ = conn.Close()
 		return nil, fmt.Errorf("set rabbitmq qos: %w", err)
@@ -49,6 +55,7 @@ func (r *RabbitMQ) Publish(ctx context.Context, job MonitorCheckJob) error {
 func (r *RabbitMQ) Consume(ctx context.Context, handler JobHandler) error {
 	msgs, err := r.ch.Consume(MonitorChecksQueue, "pulse-worker", false, false, false, false, nil)
 	if err != nil {
+		metrics.RabbitMQError()
 		return fmt.Errorf("consume %s: %w", MonitorChecksQueue, err)
 	}
 
@@ -67,15 +74,18 @@ func (r *RabbitMQ) Consume(ctx context.Context, handler JobHandler) error {
 
 func (r *RabbitMQ) handleOne(ctx context.Context, delivery amqp.Delivery, handler JobHandler) {
 	decision := HandleDelivery(ctx, delivery.Body, handler)
+	RecordDeliveryMetrics(metrics.Default(), decision)
 
 	if decision.RetryJob != nil {
 		if err := r.publishTo(ctx, decision.RetryKey, *decision.RetryJob); err != nil {
+			metrics.RabbitMQError()
 			_ = delivery.Nack(false, true)
 			return
 		}
 	}
 	if decision.DeadLetter != nil {
 		if err := r.publishTo(ctx, DeadLetterQueue, *decision.DeadLetter); err != nil {
+			metrics.RabbitMQError()
 			_ = delivery.Nack(false, true)
 			return
 		}
@@ -104,6 +114,7 @@ func (r *RabbitMQ) publishTo(ctx context.Context, routingKey string, job Monitor
 		Body:         body,
 	})
 	if err != nil {
+		metrics.RabbitMQError()
 		return fmt.Errorf("publish job %s to %s: %w", job.JobID, routingKey, err)
 	}
 	return nil

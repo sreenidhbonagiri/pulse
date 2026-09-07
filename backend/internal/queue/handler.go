@@ -3,6 +3,8 @@ package queue
 import (
 	"context"
 	"log"
+
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 )
 
 // Publisher sends monitor-check jobs to the queue.
@@ -53,4 +55,14 @@ func HandleDelivery(ctx context.Context, body []byte, handler JobHandler) Delive
 	}
 
 	return DeliveryDecision{Ack: true}
+}
+
+// RecordDeliveryMetrics counts retries and dead-letter routing.
+func RecordDeliveryMetrics(m *metrics.Metrics, decision DeliveryDecision) {
+	if decision.RetryJob != nil {
+		m.IncWorkerRetry()
+	}
+	if decision.DeadLetter != nil {
+		m.IncWorkerDLQ()
+	}
 }

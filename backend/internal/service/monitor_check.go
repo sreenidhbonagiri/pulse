@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
@@ -25,6 +27,7 @@ type MonitorCheckService struct {
 	publisher    queue.Publisher
 	incidents    *IncidentService
 	statsCache   cache.MonitorStatsCache
+	metrics      *metrics.Metrics
 }
 
 func NewMonitorCheckService(
@@ -41,11 +44,16 @@ func NewMonitorCheckService(
 		publisher:    publisher,
 		incidents:    incidents,
 		statsCache:   nil,
+		metrics:      metrics.Default(),
 	}
 }
 
 func (s *MonitorCheckService) SetStatsCache(statsCache cache.MonitorStatsCache) {
 	s.statsCache = statsCache
+}
+
+func (s *MonitorCheckService) SetMetrics(m *metrics.Metrics) {
+	s.metrics = m
 }
 
 func (s *MonitorCheckService) EnqueueCheck(ctx context.Context, monitorID uuid.UUID) (*queue.MonitorCheckJob, error) {
@@ -66,7 +74,9 @@ func (s *MonitorCheckService) RunCheck(ctx context.Context, monitorID, jobID uui
 		return nil, err
 	}
 
+	start := time.Now()
 	result := s.checker.Check(ctx, *monitor)
+	checkDuration := time.Since(start)
 	result.JobID = jobID
 	err = s.checkResults.Create(ctx, &result)
 	created := true
@@ -86,6 +96,7 @@ func (s *MonitorCheckService) RunCheck(ctx context.Context, monitorID, jobID uui
 	}
 
 	if created {
+		s.metrics.ObserveCheck(result.Success, checkDuration)
 		cache.InvalidateMonitorStats(ctx, s.statsCache, monitorID)
 	}
 

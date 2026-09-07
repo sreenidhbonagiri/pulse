@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/google/uuid"
@@ -52,7 +51,7 @@ func NewPostgresTransactor(pool *pgxpool.Pool) *PostgresTransactor {
 func (t *PostgresTransactor) WithMonitorLock(ctx context.Context, monitorID uuid.UUID, fn func(ctx context.Context) error) error {
 	tx, err := t.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return observeDBError(err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -63,18 +62,15 @@ func (t *PostgresTransactor) WithMonitorLock(ctx context.Context, monitorID uuid
 		WHERE id = $1
 		FOR UPDATE
 	`, monitorID).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNotFound
-	}
 	if err != nil {
-		return err
+		return notFoundOrDB(err)
 	}
 
 	if err := fn(withTx(ctx, tx)); err != nil {
 		return err
 	}
 
-	return tx.Commit(ctx)
+	return observeDBError(tx.Commit(ctx))
 }
 
 // MemoryTransactor serializes incident evaluation in tests.

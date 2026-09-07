@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
 )
@@ -90,6 +91,7 @@ func (s *IncidentService) evaluateLocked(ctx context.Context, monitorID uuid.UUI
 				return err
 			}
 			log.Printf("incident resolved incident_id=%s monitor_id=%s", resolved.ID, monitorID)
+			metrics.Default().DecActiveIncidents()
 			cache.InvalidateMonitorStats(ctx, s.statsCache, monitorID)
 			return nil
 		}
@@ -127,6 +129,7 @@ func (s *IncidentService) evaluateLocked(ctx context.Context, monitorID uuid.UUI
 		return err
 	}
 	log.Printf("incident opened incident_id=%s monitor_id=%s failure_count=%d", incident.ID, monitorID, incident.FailureCount)
+	metrics.Default().IncActiveIncidents()
 	cache.InvalidateMonitorStats(ctx, s.statsCache, monitorID)
 	return nil
 }

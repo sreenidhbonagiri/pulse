@@ -5,6 +5,7 @@ import (
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/config"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/service"
@@ -13,6 +14,7 @@ import (
 type Server struct {
 	addr        string
 	corsOrigins string
+	metrics     *metrics.Metrics
 	monitors    repository.MonitorRepository
 	incidents   *service.IncidentService
 	checks      *service.MonitorCheckService
@@ -34,6 +36,7 @@ func NewServer(
 	return &Server{
 		addr:        cfg.Addr,
 		corsOrigins: cfg.CORSOrigins,
+		metrics:     metrics.Default(),
 		monitors:    monitors,
 		incidents:   incidentSvc,
 		checks:      checks,
@@ -42,7 +45,9 @@ func NewServer(
 }
 
 func (s *Server) Handler() http.Handler {
-	return corsMiddleware(s.corsOrigins, s.routes())
+	mux := s.routes()
+	mux.Handle("GET /metrics", metrics.MetricsHandler(s.metrics))
+	return corsMiddleware(s.corsOrigins, metrics.HTTPMiddleware(s.metrics, mux))
 }
 
 func (s *Server) Start() error {

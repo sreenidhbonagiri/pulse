@@ -64,6 +64,22 @@ Health check:
 curl http://localhost:8080/health
 ```
 
+**Observability (Prometheus + Grafana)**
+
+```bash
+docker compose up -d
+```
+
+Prometheus scrapes the Go processes on the host through `host.docker.internal`:
+
+- API: [http://localhost:8080/metrics](http://localhost:8080/metrics)
+- Worker: [http://localhost:8081/metrics](http://localhost:8081/metrics)
+- Scheduler: [http://localhost:8082/metrics](http://localhost:8082/metrics)
+
+Open Prometheus at [http://localhost:9090](http://localhost:9090) and Grafana at [http://localhost:3000](http://localhost:3000) (anonymous viewer, or `admin` / `admin`). The Pulse dashboard and Prometheus datasource are provisioned from `monitoring/`.
+
+If Prometheus or Grafana is down, the API, worker, and scheduler keep running.
+
 **Monitors API**
 
 ```bash

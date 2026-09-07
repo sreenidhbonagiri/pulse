@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 )
 
@@ -27,6 +28,7 @@ func Dial(ctx context.Context, url string) (*Redis, error) {
 
 	client := redis.NewClient(opts)
 	if err := client.Ping(ctx).Err(); err != nil {
+		metrics.RedisError()
 		log.Printf("redis ping failed, stats will be served from postgres: %v", err)
 	}
 
@@ -39,6 +41,7 @@ func (r *Redis) GetMonitorStats(ctx context.Context, monitorID uuid.UUID) (*mode
 		return nil, nil
 	}
 	if err != nil {
+		metrics.RedisError()
 		return nil, err
 	}
 
@@ -55,13 +58,22 @@ func (r *Redis) SetMonitorStats(ctx context.Context, monitorID uuid.UUID, stats 
 	}
 	raw, err := json.Marshal(stats)
 	if err != nil {
+		metrics.RedisError()
 		return err
 	}
-	return r.client.Set(ctx, statsKey(monitorID), raw, ttl).Err()
+	if err := r.client.Set(ctx, statsKey(monitorID), raw, ttl).Err(); err != nil {
+		metrics.RedisError()
+		return err
+	}
+	return nil
 }
 
 func (r *Redis) DeleteMonitorStats(ctx context.Context, monitorID uuid.UUID) error {
-	return r.client.Del(ctx, statsKey(monitorID)).Err()
+	if err := r.client.Del(ctx, statsKey(monitorID)).Err(); err != nil {
+		metrics.RedisError()
+		return err
+	}
+	return nil
 }
 
 func (r *Redis) Close() error {

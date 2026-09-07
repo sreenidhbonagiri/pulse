@@ -52,7 +52,7 @@ func (r *PostgresMonitorRepository) Create(ctx context.Context, monitor *models.
 
 	scanned, err := scanMonitor(row)
 	if err != nil {
-		return err
+		return observeDBError(err)
 	}
 	*monitor = *scanned
 	return nil
@@ -64,11 +64,8 @@ func (r *PostgresMonitorRepository) GetByID(ctx context.Context, id uuid.UUID) (
 		FROM monitors
 		WHERE id = $1
 	`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
-		return nil, err
+		return nil, notFoundOrDB(err)
 	}
 	return monitor, nil
 }
@@ -80,7 +77,7 @@ func (r *PostgresMonitorRepository) List(ctx context.Context) ([]models.Monitor,
 		ORDER BY created_at DESC
 	`)
 	if err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 	defer rows.Close()
 	return collectMonitors(rows)
@@ -97,7 +94,7 @@ func (r *PostgresMonitorRepository) ListDue(ctx context.Context, now time.Time, 
 		LIMIT $2
 	`, now, clampDueLimit(limit))
 	if err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 	defer rows.Close()
 	return collectMonitors(rows)
@@ -106,7 +103,7 @@ func (r *PostgresMonitorRepository) ListDue(ctx context.Context, now time.Time, 
 func (r *PostgresMonitorRepository) ClaimDue(ctx context.Context, now time.Time, enqueue func(models.Monitor) error) (*models.Monitor, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -124,7 +121,7 @@ func (r *PostgresMonitorRepository) ClaimDue(ctx context.Context, now time.Time,
 		return nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 
 	if err := enqueue(*monitor); err != nil {
@@ -137,11 +134,11 @@ func (r *PostgresMonitorRepository) ClaimDue(ctx context.Context, now time.Time,
 		SET next_check_at = $2, updated_at = NOW()
 		WHERE id = $1
 	`, monitor.ID, next); err != nil {
-		return monitor, err
+		return monitor, observeDBError(err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return monitor, err
+		return monitor, observeDBError(err)
 	}
 
 	monitor.NextCheckAt = &next
@@ -177,11 +174,8 @@ func (r *PostgresMonitorRepository) Update(ctx context.Context, monitor *models.
 	)
 
 	scanned, err := scanMonitor(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNotFound
-	}
 	if err != nil {
-		return err
+		return notFoundOrDB(err)
 	}
 	*monitor = *scanned
 	return nil
@@ -190,7 +184,7 @@ func (r *PostgresMonitorRepository) Update(ctx context.Context, monitor *models.
 func (r *PostgresMonitorRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM monitors WHERE id = $1`, id)
 	if err != nil {
-		return err
+		return observeDBError(err)
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
@@ -207,12 +201,12 @@ func collectMonitors(rows pgx.Rows) ([]models.Monitor, error) {
 	for rows.Next() {
 		monitor, err := scanMonitor(rows)
 		if err != nil {
-			return nil, err
+			return nil, observeDBError(err)
 		}
 		monitors = append(monitors, *monitor)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 	return monitors, nil
 }

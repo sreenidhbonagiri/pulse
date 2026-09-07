@@ -8,6 +8,7 @@ import (
 	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/config"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/database"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
 )
@@ -15,6 +16,7 @@ import (
 func main() {
 	cfg := config.Load()
 	ctx := context.Background()
+	metrics.Init("api")
 
 	pool, err := database.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {

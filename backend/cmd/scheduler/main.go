@@ -9,6 +9,7 @@ import (
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/config"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/database"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/scheduler"
@@ -18,6 +19,9 @@ func main() {
 	cfg := config.Load()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	m := metrics.Init("scheduler")
+	metrics.StartServer(ctx, cfg.SchedulerMetricsAddr, m)
 
 	pool, err := database.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {

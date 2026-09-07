@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/sreenidhbonagiri/pulse/backend/internal/metrics"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
@@ -21,6 +22,7 @@ type Scheduler struct {
 	publisher queue.Publisher
 	interval  time.Duration
 	batchSize int
+	metrics   *metrics.Metrics
 }
 
 func New(monitors repository.MonitorRepository, publisher queue.Publisher) *Scheduler {
@@ -29,6 +31,7 @@ func New(monitors repository.MonitorRepository, publisher queue.Publisher) *Sche
 		publisher: publisher,
 		interval:  DefaultPollInterval,
 		batchSize: DefaultBatchSize,
+		metrics:   metrics.Default(),
 	}
 }
 
@@ -49,6 +52,11 @@ func (s *Scheduler) Run(ctx context.Context) error {
 }
 
 func (s *Scheduler) Tick(ctx context.Context, now time.Time) {
+	start := time.Now()
+	defer func() {
+		s.metrics.ObserveSchedulerCycle(time.Since(start))
+	}()
+
 	for i := 0; i < s.batchSize; i++ {
 		if ctx.Err() != nil {
 			return
@@ -59,10 +67,12 @@ func (s *Scheduler) Tick(ctx context.Context, now time.Time) {
 			if err := s.publisher.Publish(ctx, job); err != nil {
 				return err
 			}
+			s.metrics.IncSchedulerEnqueued()
 			log.Printf("scheduled monitor_id=%s job_id=%s", monitor.ID, job.JobID)
 			return nil
 		})
 		if err != nil {
+			s.metrics.IncSchedulerEnqueueFailure()
 			log.Printf("scheduler failed to enqueue a due monitor: %v", err)
 			continue
 		}

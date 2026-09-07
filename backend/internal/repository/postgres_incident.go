@@ -2,12 +2,9 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
@@ -69,11 +66,8 @@ func (r *PostgresIncidentRepository) GetByID(ctx context.Context, id uuid.UUID) 
 		FROM incidents
 		WHERE id = $1
 	`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
-		return nil, err
+		return nil, notFoundOrDB(err)
 	}
 	return incident, nil
 }
@@ -84,11 +78,8 @@ func (r *PostgresIncidentRepository) GetOpenByMonitorID(ctx context.Context, mon
 		FROM incidents
 		WHERE monitor_id = $1 AND status = $2
 	`, monitorID, models.IncidentStatusOpen))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
-		return nil, err
+		return nil, notFoundOrDB(err)
 	}
 	return incident, nil
 }
@@ -102,7 +93,7 @@ func (r *PostgresIncidentRepository) ListByMonitorID(ctx context.Context, monito
 		LIMIT $2
 	`, monitorID, clampIncidentLimit(limit))
 	if err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 	defer rows.Close()
 
@@ -110,12 +101,12 @@ func (r *PostgresIncidentRepository) ListByMonitorID(ctx context.Context, monito
 	for rows.Next() {
 		incident, err := scanIncident(rows)
 		if err != nil {
-			return nil, err
+			return nil, observeDBError(err)
 		}
 		incidents = append(incidents, *incident)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 	return incidents, nil
 }
@@ -130,11 +121,8 @@ func (r *PostgresIncidentRepository) IncrementFailureCount(ctx context.Context, 
 		failureCount,
 		models.IncidentStatusOpen,
 	))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
-		return nil, err
+		return nil, notFoundOrDB(err)
 	}
 	return incident, nil
 }
@@ -154,11 +142,8 @@ func (r *PostgresIncidentRepository) Resolve(ctx context.Context, id uuid.UUID, 
 		resolvedAt,
 		models.IncidentStatusOpen,
 	))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
-		return nil, err
+		return nil, notFoundOrDB(err)
 	}
 	return incident, nil
 }
@@ -172,7 +157,20 @@ func (r *PostgresIncidentRepository) CountByMonitorID(ctx context.Context, monit
 		  AND started_at >= $2
 	`, monitorID, since).Scan(&count)
 	if err != nil {
-		return 0, err
+		return 0, observeDBError(err)
+	}
+	return count, nil
+}
+
+func (r *PostgresIncidentRepository) CountOpen(ctx context.Context) (int, error) {
+	var count int
+	err := r.q(ctx).QueryRow(ctx, `
+		SELECT COUNT(*)::int
+		FROM incidents
+		WHERE status = $1
+	`, models.IncidentStatusOpen).Scan(&count)
+	if err != nil {
+		return 0, observeDBError(err)
 	}
 	return count, nil
 }
@@ -193,12 +191,4 @@ func scanIncident(row scanner) (*models.Incident, error) {
 		return nil, err
 	}
 	return &incident, nil
-}
-
-func mapUniqueViolation(err error) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return ErrDuplicate
-	}
-	return err
 }

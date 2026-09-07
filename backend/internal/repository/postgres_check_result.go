@@ -2,11 +2,9 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
@@ -64,11 +62,8 @@ func (r *PostgresCheckResultRepository) GetByID(ctx context.Context, id uuid.UUI
 		FROM check_results
 		WHERE id = $1
 	`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
-		return nil, err
+		return nil, notFoundOrDB(err)
 	}
 	return result, nil
 }
@@ -79,11 +74,8 @@ func (r *PostgresCheckResultRepository) GetByJobID(ctx context.Context, jobID uu
 		FROM check_results
 		WHERE job_id = $1
 	`, jobID))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
-		return nil, err
+		return nil, notFoundOrDB(err)
 	}
 	return result, nil
 }
@@ -97,7 +89,7 @@ func (r *PostgresCheckResultRepository) ListByMonitorID(ctx context.Context, mon
 		LIMIT $2
 	`, monitorID, clampCheckResultLimit(limit))
 	if err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 	defer rows.Close()
 
@@ -105,12 +97,12 @@ func (r *PostgresCheckResultRepository) ListByMonitorID(ctx context.Context, mon
 	for rows.Next() {
 		result, err := scanCheckResult(rows)
 		if err != nil {
-			return nil, err
+			return nil, observeDBError(err)
 		}
 		results = append(results, *result)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, observeDBError(err)
 	}
 
 	return results, nil
@@ -145,7 +137,7 @@ func (r *PostgresCheckResultRepository) GetCheckStats(ctx context.Context, monit
 		&p99,
 	)
 	if err != nil {
-		return CheckStats{}, err
+		return CheckStats{}, observeDBError(err)
 	}
 	stats.AverageLatencyMs = round2(derefFloat(avg))
 	stats.P50LatencyMs = round2(derefFloat(p50))
