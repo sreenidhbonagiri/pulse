@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/config"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
@@ -14,6 +15,7 @@ type Server struct {
 	monitors  repository.MonitorRepository
 	incidents *service.IncidentService
 	checks    *service.MonitorCheckService
+	stats     *service.MonitorStatsService
 }
 
 func NewServer(
@@ -22,13 +24,18 @@ func NewServer(
 	checkResults repository.CheckResultRepository,
 	incidents repository.IncidentRepository,
 	publisher queue.Publisher,
+	statsCache cache.MonitorStatsCache,
 ) *Server {
 	incidentSvc := service.NewIncidentService(checkResults, incidents, repository.NewMemoryTransactor())
+	incidentSvc.SetStatsCache(statsCache)
+	checks := service.NewMonitorCheckService(monitors, checkResults, nil, publisher, incidentSvc)
+	checks.SetStatsCache(statsCache)
 	return &Server{
 		addr:      cfg.Addr,
 		monitors:  monitors,
 		incidents: incidentSvc,
-		checks:    service.NewMonitorCheckService(monitors, checkResults, nil, publisher, incidentSvc),
+		checks:    checks,
+		stats:     service.NewMonitorStatsService(monitors, checkResults, incidents, statsCache),
 	}
 }
 

@@ -380,3 +380,15 @@ func (m *memoryIncidents) Resolve(_ context.Context, id uuid.UUID, resolvedAt ti
 	copied := incident
 	return &copied, nil
 }
+
+func (m *memoryIncidents) CountByMonitorID(_ context.Context, monitorID uuid.UUID, since time.Time) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	count := 0
+	for _, incident := range m.items {
+		if incident.MonitorID == monitorID && !incident.StartedAt.Before(since) {
+			count++
+		}
+	}
+	return count, nil
+}

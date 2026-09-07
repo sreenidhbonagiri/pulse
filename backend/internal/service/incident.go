@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
 )
@@ -22,6 +23,7 @@ type IncidentService struct {
 	checks     repository.CheckResultRepository
 	incidents  repository.IncidentRepository
 	transactor repository.Transactor
+	statsCache cache.MonitorStatsCache
 }
 
 func NewIncidentService(
@@ -34,6 +36,10 @@ func NewIncidentService(
 		incidents:  incidents,
 		transactor: transactor,
 	}
+}
+
+func (s *IncidentService) SetStatsCache(statsCache cache.MonitorStatsCache) {
+	s.statsCache = statsCache
 }
 
 func (s *IncidentService) Evaluate(ctx context.Context, result models.CheckResult) error {
@@ -84,6 +90,7 @@ func (s *IncidentService) evaluateLocked(ctx context.Context, monitorID uuid.UUI
 				return err
 			}
 			log.Printf("incident resolved incident_id=%s monitor_id=%s", resolved.ID, monitorID)
+			cache.InvalidateMonitorStats(ctx, s.statsCache, monitorID)
 			return nil
 		}
 
@@ -96,6 +103,7 @@ func (s *IncidentService) evaluateLocked(ctx context.Context, monitorID uuid.UUI
 				if _, err := s.incidents.IncrementFailureCount(ctx, open.ID, count); err != nil && !errors.Is(err, repository.ErrNotFound) {
 					return err
 				}
+				cache.InvalidateMonitorStats(ctx, s.statsCache, monitorID)
 			}
 		}
 		return nil
@@ -119,6 +127,7 @@ func (s *IncidentService) evaluateLocked(ctx context.Context, monitorID uuid.UUI
 		return err
 	}
 	log.Printf("incident opened incident_id=%s monitor_id=%s failure_count=%d", incident.ID, monitorID, incident.FailureCount)
+	cache.InvalidateMonitorStats(ctx, s.statsCache, monitorID)
 	return nil
 }
 
@@ -138,7 +147,11 @@ func (s *IncidentService) updateExistingOpenCount(ctx context.Context, monitorID
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	cache.InvalidateMonitorStats(ctx, s.statsCache, monitorID)
+	return nil
 }
 
 func consecutiveStreaks(checks []models.CheckResult) (failures, successes int) {

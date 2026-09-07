@@ -163,6 +163,20 @@ func (r *PostgresIncidentRepository) Resolve(ctx context.Context, id uuid.UUID, 
 	return incident, nil
 }
 
+func (r *PostgresIncidentRepository) CountByMonitorID(ctx context.Context, monitorID uuid.UUID, since time.Time) (int, error) {
+	var count int
+	err := r.q(ctx).QueryRow(ctx, `
+		SELECT COUNT(*)::int
+		FROM incidents
+		WHERE monitor_id = $1
+		  AND started_at >= $2
+	`, monitorID, since).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func scanIncident(row scanner) (*models.Incident, error) {
 	var incident models.Incident
 	err := row.Scan(

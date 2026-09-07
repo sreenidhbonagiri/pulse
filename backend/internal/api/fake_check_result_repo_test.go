@@ -78,3 +78,13 @@ func (f *fakeCheckResultRepo) ListByMonitorID(_ context.Context, monitorID uuid.
 	}
 	return listed[:limit], nil
 }
+
+func (f *fakeCheckResultRepo) GetCheckStats(_ context.Context, monitorID uuid.UUID, since time.Time) (repository.CheckStats, error) {
+	results := make([]models.CheckResult, 0)
+	for _, result := range f.results {
+		if result.MonitorID == monitorID {
+			results = append(results, result)
+		}
+	}
+	return repository.ComputeCheckStats(results, since), nil
+}

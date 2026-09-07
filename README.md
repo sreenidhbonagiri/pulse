@@ -4,7 +4,7 @@ A distributed uptime and API monitoring platform.
 
 ## Quick start
 
-**PostgreSQL and RabbitMQ**
+**PostgreSQL, RabbitMQ, and Redis**
 
 ```bash
 cp .env.example .env
@@ -12,6 +12,7 @@ docker compose up -d
 ```
 
 RabbitMQ management UI: [http://localhost:15672](http://localhost:15672) (user `guest`, password `guest`).
+Redis is used only to cache monitor statistics. The API still works if Redis is down.
 
 **Frontend**
 
@@ -23,7 +24,7 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173).
 
-**Backend** (requires [Go](https://go.dev/doc/install), PostgreSQL, and RabbitMQ)
+**Backend** (requires [Go](https://go.dev/doc/install), PostgreSQL, and RabbitMQ. Redis is optional.)
 
 API:
 
@@ -69,7 +70,18 @@ curl -X POST http://localhost:8080/api/monitors/MONITOR_ID/check
 curl -s http://localhost:8080/api/monitors/MONITOR_ID/checks
 curl -s http://localhost:8080/api/monitors/MONITOR_ID/incidents
 curl -s http://localhost:8080/api/monitors/MONITOR_ID/incidents/active
+curl -s http://localhost:8080/api/monitors/MONITOR_ID/stats
 ```
+
+## Monitor statistics
+
+`GET /api/monitors/{id}/stats` returns current status, uptime, latency percentiles, check counts, and incident summary.
+
+- Check totals, uptime, and latency use the **last 24 hours**
+- `current_status` is the latest check overall (`up`, `down`, or `unknown`)
+- `active_incident` is the current open incident, if any
+- Results are cached in Redis for 45 seconds (cache-aside)
+- A new check or incident change deletes that monitor's cache entry
 
 ## Incidents
 
@@ -84,7 +96,7 @@ go test ./...
 go build ./...
 ```
 
-Postgres-backed tests skip automatically if `DATABASE_URL` is unreachable.
+Postgres-backed tests skip automatically if `DATABASE_URL` is unreachable. Redis cache tests skip if `REDIS_URL` is unreachable.
 
 ## Retries and dead-letter queue
 

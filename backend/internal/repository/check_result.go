@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -19,6 +20,7 @@ type CheckResultRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.CheckResult, error)
 	GetByJobID(ctx context.Context, jobID uuid.UUID) (*models.CheckResult, error)
 	ListByMonitorID(ctx context.Context, monitorID uuid.UUID, limit int) ([]models.CheckResult, error)
+	GetCheckStats(ctx context.Context, monitorID uuid.UUID, since time.Time) (CheckStats, error)
 }
 
 func clampCheckResultLimit(limit int) int {

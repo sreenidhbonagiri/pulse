@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/config"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
@@ -168,7 +169,7 @@ func newTestEnv() testEnv {
 	incidents := newFakeIncidentRepo()
 	publisher := queue.NewMemoryPublisher()
 	return testEnv{
-		handler:      NewServer(config.Config{}, monitors, checkResults, incidents, publisher).Handler(),
+		handler:      NewServer(config.Config{}, monitors, checkResults, incidents, publisher, cache.NewMemory()).Handler(),
 		checkResults: checkResults,
 		incidents:    incidents,
 		publisher:    publisher,

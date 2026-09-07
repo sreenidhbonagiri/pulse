@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
@@ -23,6 +24,7 @@ type MonitorCheckService struct {
 	checker      HTTPChecker
 	publisher    queue.Publisher
 	incidents    *IncidentService
+	statsCache   cache.MonitorStatsCache
 }
 
 func NewMonitorCheckService(
@@ -38,7 +40,12 @@ func NewMonitorCheckService(
 		checker:      checker,
 		publisher:    publisher,
 		incidents:    incidents,
+		statsCache:   nil,
 	}
+}
+
+func (s *MonitorCheckService) SetStatsCache(statsCache cache.MonitorStatsCache) {
+	s.statsCache = statsCache
 }
 
 func (s *MonitorCheckService) EnqueueCheck(ctx context.Context, monitorID uuid.UUID) (*queue.MonitorCheckJob, error) {
@@ -62,18 +69,24 @@ func (s *MonitorCheckService) RunCheck(ctx context.Context, monitorID, jobID uui
 	result := s.checker.Check(ctx, *monitor)
 	result.JobID = jobID
 	err = s.checkResults.Create(ctx, &result)
+	created := true
 	if errors.Is(err, repository.ErrDuplicate) {
 		saved, lookupErr := s.checkResults.GetByJobID(ctx, jobID)
 		if lookupErr != nil {
 			return nil, lookupErr
 		}
 		result = *saved
+		created = false
 	} else if err != nil {
 		return nil, err
 	}
 
 	if err := s.incidents.Evaluate(ctx, result); err != nil {
 		return nil, err
+	}
+
+	if created {
+		cache.InvalidateMonitorStats(ctx, s.statsCache, monitorID)
 	}
 
 	return &result, nil

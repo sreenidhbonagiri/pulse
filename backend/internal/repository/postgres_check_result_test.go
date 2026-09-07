@@ -176,6 +176,57 @@ func TestPostgresCheckResultRepository(t *testing.T) {
 			t.Fatalf("err = %v, want ErrNotFound after cascade", err)
 		}
 	})
+
+	t.Run("aggregate stats in postgres", func(t *testing.T) {
+		monitor := createRepoTestMonitor(t, ctx, monitors)
+		now := time.Now().UTC()
+		latencies := []int{10, 20, 30, 40, 50}
+		for i, ms := range latencies {
+			success := ms != 30
+			status := 200
+			if !success {
+				status = 500
+			}
+			result := &models.CheckResult{
+				JobID:          uuid.New(),
+				MonitorID:      monitor.ID,
+				StatusCode:     &status,
+				ResponseTimeMs: ms,
+				Success:        success,
+				CheckedAt:      now.Add(-time.Duration(len(latencies)-i) * time.Minute),
+			}
+			if err := results.Create(ctx, result); err != nil {
+				t.Fatal(err)
+			}
+		}
+		old := &models.CheckResult{
+			JobID:          uuid.New(),
+			MonitorID:      monitor.ID,
+			ResponseTimeMs: 999,
+			Success:        false,
+			CheckedAt:      now.Add(-48 * time.Hour),
+		}
+		if err := results.Create(ctx, old); err != nil {
+			t.Fatal(err)
+		}
+
+		stats, err := results.GetCheckStats(ctx, monitor.ID, now.Add(-time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stats.TotalChecks != 5 || stats.FailedChecks != 1 {
+			t.Fatalf("totals = %+v", stats)
+		}
+		if stats.LatestSuccess == nil || !*stats.LatestSuccess {
+			t.Fatal("expected latest success")
+		}
+		if stats.AverageLatencyMs != 30 || stats.P50LatencyMs != 30 {
+			t.Fatalf("latency = %+v", stats)
+		}
+		if stats.P95LatencyMs != 48 || stats.P99LatencyMs != 49.6 {
+			t.Fatalf("percentiles p95=%v p99=%v", stats.P95LatencyMs, stats.P99LatencyMs)
+		}
+	})
 }
 
 func createRepoTestMonitor(t *testing.T, ctx context.Context, monitors *PostgresMonitorRepository) *models.Monitor {

@@ -244,3 +244,6 @@ func (f failingIncidentRepo) IncrementFailureCount(_ context.Context, _ uuid.UUI
 func (f failingIncidentRepo) Resolve(_ context.Context, _ uuid.UUID, _ time.Time) (*models.Incident, error) {
 	return nil, f.err
 }
+func (f failingIncidentRepo) CountByMonitorID(_ context.Context, _ uuid.UUID, _ time.Time) (int, error) {
+	return 0, f.err
+}

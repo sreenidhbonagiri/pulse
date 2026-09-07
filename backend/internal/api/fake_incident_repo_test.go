@@ -94,6 +94,18 @@ func (f *fakeIncidentRepo) ListByMonitorID(_ context.Context, monitorID uuid.UUI
 	return listed[:limit], nil
 }
 
+func (f *fakeIncidentRepo) CountByMonitorID(_ context.Context, monitorID uuid.UUID, since time.Time) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	count := 0
+	for _, incident := range f.incidents {
+		if incident.MonitorID == monitorID && !incident.StartedAt.Before(since) {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (f *fakeIncidentRepo) IncrementFailureCount(_ context.Context, id uuid.UUID, failureCount int) (*models.Incident, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/sreenidhbonagiri/pulse/backend/internal/cache"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/config"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/database"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/monitoring"
@@ -50,6 +51,16 @@ func main() {
 		nil,
 		incidents,
 	)
+
+	statsCache, err := cache.Dial(ctx, cfg.RedisURL)
+	if err != nil {
+		log.Printf("redis disabled, stats cache invalidation skipped: %v", err)
+	}
+	if statsCache != nil {
+		defer statsCache.Close()
+		incidents.SetStatsCache(statsCache)
+		checks.SetStatsCache(statsCache)
+	}
 
 	log.Printf("Pulse worker listening on queue %s", queue.MonitorChecksQueue)
 	if err := rmq.Consume(ctx, worker.New(checks).HandleJob); err != nil {

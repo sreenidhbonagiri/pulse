@@ -116,6 +116,51 @@ func (r *PostgresCheckResultRepository) ListByMonitorID(ctx context.Context, mon
 	return results, nil
 }
 
+func (r *PostgresCheckResultRepository) GetCheckStats(ctx context.Context, monitorID uuid.UUID, since time.Time) (CheckStats, error) {
+	var stats CheckStats
+	var avg, p50, p95, p99 *float64
+	err := r.q(ctx).QueryRow(ctx, `
+		SELECT
+			(SELECT success
+			 FROM check_results
+			 WHERE monitor_id = $1
+			 ORDER BY checked_at DESC
+			 LIMIT 1) AS latest_success,
+			COUNT(*)::int AS total_checks,
+			COUNT(*) FILTER (WHERE success = FALSE)::int AS failed_checks,
+			AVG(response_time_ms) AS avg_latency,
+			percentile_cont(0.50) WITHIN GROUP (ORDER BY response_time_ms) AS p50,
+			percentile_cont(0.95) WITHIN GROUP (ORDER BY response_time_ms) AS p95,
+			percentile_cont(0.99) WITHIN GROUP (ORDER BY response_time_ms) AS p99
+		FROM check_results
+		WHERE monitor_id = $1
+		  AND checked_at >= $2
+	`, monitorID, since).Scan(
+		&stats.LatestSuccess,
+		&stats.TotalChecks,
+		&stats.FailedChecks,
+		&avg,
+		&p50,
+		&p95,
+		&p99,
+	)
+	if err != nil {
+		return CheckStats{}, err
+	}
+	stats.AverageLatencyMs = round2(derefFloat(avg))
+	stats.P50LatencyMs = round2(derefFloat(p50))
+	stats.P95LatencyMs = round2(derefFloat(p95))
+	stats.P99LatencyMs = round2(derefFloat(p99))
+	return stats, nil
+}
+
+func derefFloat(value *float64) float64 {
+	if value == nil {
+		return 0
+	}
+	return *value
+}
+
 func scanCheckResult(row scanner) (*models.CheckResult, error) {
 	var result models.CheckResult
 	var jobID *uuid.UUID

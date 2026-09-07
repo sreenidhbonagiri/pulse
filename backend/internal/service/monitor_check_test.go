@@ -264,6 +264,16 @@ func (m *memoryCheckResults) ListByMonitorID(_ context.Context, monitorID uuid.U
 	return listed[:limit], nil
 }
 
+func (m *memoryCheckResults) GetCheckStats(_ context.Context, monitorID uuid.UUID, since time.Time) (repository.CheckStats, error) {
+	results := make([]models.CheckResult, 0)
+	for _, result := range m.results {
+		if result.MonitorID == monitorID {
+			results = append(results, result)
+		}
+	}
+	return repository.ComputeCheckStats(results, since), nil
+}
+
 func storedMonitor() models.Monitor {
 	return models.Monitor{
 		ID:                 uuid.New(),

@@ -22,6 +22,7 @@ type IncidentRepository interface {
 	ListByMonitorID(ctx context.Context, monitorID uuid.UUID, limit int) ([]models.Incident, error)
 	IncrementFailureCount(ctx context.Context, id uuid.UUID, failureCount int) (*models.Incident, error)
 	Resolve(ctx context.Context, id uuid.UUID, resolvedAt time.Time) (*models.Incident, error)
+	CountByMonitorID(ctx context.Context, monitorID uuid.UUID, since time.Time) (int, error)
 }
 
 func clampIncidentLimit(limit int) int {

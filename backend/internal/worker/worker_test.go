@@ -367,6 +367,16 @@ func (m *memoryCheckResults) ListByMonitorID(_ context.Context, monitorID uuid.U
 	return listed[:limit], nil
 }
 
+func (m *memoryCheckResults) GetCheckStats(_ context.Context, monitorID uuid.UUID, since time.Time) (repository.CheckStats, error) {
+	results := make([]models.CheckResult, 0)
+	for _, result := range m.results {
+		if result.MonitorID == monitorID {
+			results = append(results, result)
+		}
+	}
+	return repository.ComputeCheckStats(results, since), nil
+}
+
 type failingCheckResults struct {
 	err error
 }
@@ -385,6 +395,10 @@ func (f failingCheckResults) GetByID(_ context.Context, _ uuid.UUID) (*models.Ch
 
 func (f failingCheckResults) ListByMonitorID(_ context.Context, _ uuid.UUID, _ int) ([]models.CheckResult, error) {
 	return nil, nil
+}
+
+func (f failingCheckResults) GetCheckStats(_ context.Context, _ uuid.UUID, _ time.Time) (repository.CheckStats, error) {
+	return repository.CheckStats{}, f.err
 }
 
 type workerIncidents struct {
@@ -466,4 +480,14 @@ func (m *workerIncidents) Resolve(_ context.Context, id uuid.UUID, resolvedAt ti
 	m.items[id] = incident
 	copied := incident
 	return &copied, nil
+}
+
+func (m *workerIncidents) CountByMonitorID(_ context.Context, monitorID uuid.UUID, since time.Time) (int, error) {
+	count := 0
+	for _, incident := range m.items {
+		if incident.MonitorID == monitorID && !incident.StartedAt.Before(since) {
+			count++
+		}
+	}
+	return count, nil
 }
