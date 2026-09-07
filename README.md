@@ -4,12 +4,14 @@ A distributed uptime and API monitoring platform.
 
 ## Quick start
 
-**PostgreSQL**
+**PostgreSQL and RabbitMQ**
 
 ```bash
 cp .env.example .env
 docker compose up -d
 ```
+
+RabbitMQ management UI: [http://localhost:15672](http://localhost:15672) (user `guest`, password `guest`).
 
 **Frontend**
 
@@ -21,14 +23,23 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173).
 
-**Backend** (requires [Go](https://go.dev/doc/install) and PostgreSQL running)
+**Backend** (requires [Go](https://go.dev/doc/install), PostgreSQL, and RabbitMQ)
+
+API:
 
 ```bash
 cd backend
 go run ./cmd/api
 ```
 
-Then test the health endpoint:
+Worker (separate terminal):
+
+```bash
+cd backend
+go run ./cmd/worker
+```
+
+Health check:
 
 ```bash
 curl http://localhost:8080/health
@@ -44,7 +55,7 @@ curl -X POST http://localhost:8080/api/monitors \
 curl http://localhost:8080/api/monitors
 ```
 
-**Manual check** (temporary endpoint)
+**Enqueue a check** (the worker performs it in the background)
 
 ```bash
 curl -X POST http://localhost:8080/api/monitors/MONITOR_ID/check

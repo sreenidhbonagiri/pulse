@@ -11,6 +11,7 @@ import (
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/config"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 )
 
 const validMonitorJSON = `{
@@ -151,7 +152,24 @@ func TestDeleteMonitor(t *testing.T) {
 }
 
 func newTestHandler() http.Handler {
-	return NewServer(config.Config{}, newFakeMonitorRepo(), newFakeCheckResultRepo()).Handler()
+	return newTestEnv().handler
+}
+
+type testEnv struct {
+	handler      http.Handler
+	checkResults *fakeCheckResultRepo
+	publisher    *queue.MemoryPublisher
+}
+
+func newTestEnv() testEnv {
+	monitors := newFakeMonitorRepo()
+	checkResults := newFakeCheckResultRepo()
+	publisher := queue.NewMemoryPublisher()
+	return testEnv{
+		handler:      NewServer(config.Config{}, monitors, checkResults, publisher).Handler(),
+		checkResults: checkResults,
+		publisher:    publisher,
+	}
 }
 
 func doRequest(t *testing.T, handler http.Handler, method, path, body string) *httptest.ResponseRecorder {

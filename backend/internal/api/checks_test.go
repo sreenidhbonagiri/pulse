@@ -3,129 +3,83 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 )
 
-func TestManualCheckSuccess(t *testing.T) {
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer target.Close()
+func TestEnqueueCheckAccepted(t *testing.T) {
+	env := newTestEnv()
+	monitor := createJSONMonitor(t, env.handler, "https://example.com/health", http.StatusOK)
 
-	handler := newTestHandler()
-	monitor := createJSONMonitor(t, handler, target.URL, http.StatusOK)
-
-	rec := doRequest(t, handler, http.MethodPost, "/api/monitors/"+monitor.ID.String()+"/check", "")
-	if rec.Code != http.StatusCreated {
+	rec := doRequest(t, env.handler, http.MethodPost, "/api/monitors/"+monitor.ID.String()+"/check", "")
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 
-	var result models.CheckResult
-	decodeBody(t, rec, &result)
-	if result.ID == uuid.Nil {
-		t.Fatal("expected saved check result id")
+	var job queue.MonitorCheckJob
+	decodeBody(t, rec, &job)
+	if job.JobID == uuid.Nil {
+		t.Fatal("expected job_id")
 	}
-	if result.MonitorID != monitor.ID {
-		t.Fatalf("monitor_id = %s, want %s", result.MonitorID, monitor.ID)
+	if job.MonitorID != monitor.ID {
+		t.Fatalf("monitor_id = %s, want %s", job.MonitorID, monitor.ID)
 	}
-	if !result.Success {
-		t.Fatalf("success = false, error = %v", result.ErrorMessage)
-	}
-	if result.StatusCode == nil || *result.StatusCode != http.StatusOK {
-		t.Fatalf("status_code = %v", result.StatusCode)
-	}
-}
-
-func TestManualCheckFailedHTTPStatus(t *testing.T) {
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer target.Close()
-
-	handler := newTestHandler()
-	monitor := createJSONMonitor(t, handler, target.URL, http.StatusOK)
-
-	rec := doRequest(t, handler, http.MethodPost, "/api/monitors/"+monitor.ID.String()+"/check", "")
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	if len(env.publisher.Jobs) != 1 || env.publisher.Jobs[0].JobID != job.JobID {
+		t.Fatalf("published jobs = %+v", env.publisher.Jobs)
 	}
 
-	var result models.CheckResult
-	decodeBody(t, rec, &result)
-	if result.Success {
-		t.Fatal("expected success = false when the target returns 500")
-	}
-	if result.StatusCode == nil || *result.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("status_code = %v", result.StatusCode)
-	}
-	if result.ErrorMessage == nil {
-		t.Fatal("expected error_message")
-	}
-}
-
-func TestManualCheckUnknownMonitor(t *testing.T) {
-	handler := newTestHandler()
-	path := "/api/monitors/" + uuid.NewString() + "/check"
-
-	rec := doRequest(t, handler, http.MethodPost, path, "")
-	assertErrorStatus(t, rec, http.StatusNotFound, "monitor not found")
-}
-
-func TestManualCheckReturnsSavedResult(t *testing.T) {
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer target.Close()
-
-	handler := newTestHandler()
-	monitor := createJSONMonitor(t, handler, target.URL, http.StatusOK)
-
-	rec := doRequest(t, handler, http.MethodPost, "/api/monitors/"+monitor.ID.String()+"/check", "")
-	var created models.CheckResult
-	decodeBody(t, rec, &created)
-
-	listed := doRequest(t, handler, http.MethodGet, "/api/monitors/"+monitor.ID.String()+"/checks", "")
-	if listed.Code != http.StatusOK {
-		t.Fatalf("list status = %d, body = %s", listed.Code, listed.Body.String())
-	}
-
+	listed := doRequest(t, env.handler, http.MethodGet, "/api/monitors/"+monitor.ID.String()+"/checks", "")
 	var results []models.CheckResult
 	decodeBody(t, listed, &results)
-	if len(results) != 1 {
-		t.Fatalf("len = %d, want 1", len(results))
+	if len(results) != 0 {
+		t.Fatal("enqueue should not run the check immediately")
 	}
-	if results[0].ID != created.ID {
-		t.Fatalf("listed id = %s, want %s", results[0].ID, created.ID)
+}
+
+func TestEnqueueCheckUnknownMonitor(t *testing.T) {
+	env := newTestEnv()
+	path := "/api/monitors/" + uuid.NewString() + "/check"
+
+	rec := doRequest(t, env.handler, http.MethodPost, path, "")
+	assertErrorStatus(t, rec, http.StatusNotFound, "monitor not found")
+	if len(env.publisher.Jobs) != 0 {
+		t.Fatal("should not publish a job for an unknown monitor")
 	}
 }
 
 func TestListMonitorChecks(t *testing.T) {
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer target.Close()
+	env := newTestEnv()
+	monitor := createJSONMonitor(t, env.handler, "https://example.com/health", http.StatusOK)
 
-	handler := newTestHandler()
-	monitor := createJSONMonitor(t, handler, target.URL, http.StatusOK)
-	path := "/api/monitors/" + monitor.ID.String() + "/check"
-
-	first := doRequest(t, handler, http.MethodPost, path, "")
-	time.Sleep(2 * time.Millisecond)
-	second := doRequest(t, handler, http.MethodPost, path, "")
-	if first.Code != http.StatusCreated || second.Code != http.StatusCreated {
-		t.Fatalf("check statuses = %d, %d", first.Code, second.Code)
+	older := models.CheckResult{
+		MonitorID:      monitor.ID,
+		ResponseTimeMs: 10,
+		Success:        true,
+		CheckedAt:      time.Now().UTC().Add(-time.Minute),
+	}
+	newer := models.CheckResult{
+		MonitorID:      monitor.ID,
+		ResponseTimeMs: 20,
+		Success:        true,
+		CheckedAt:      time.Now().UTC(),
+	}
+	if err := env.checkResults.Create(nil, &older); err != nil {
+		t.Fatal(err)
+	}
+	if err := env.checkResults.Create(nil, &newer); err != nil {
+		t.Fatal(err)
 	}
 
-	var newer models.CheckResult
-	decodeBody(t, second, &newer)
+	listed := doRequest(t, env.handler, http.MethodGet, "/api/monitors/"+monitor.ID.String()+"/checks", "")
+	if listed.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", listed.Code, listed.Body.String())
+	}
 
-	listed := doRequest(t, handler, http.MethodGet, "/api/monitors/"+monitor.ID.String()+"/checks", "")
 	var results []models.CheckResult
 	decodeBody(t, listed, &results)
 	if len(results) != 2 {

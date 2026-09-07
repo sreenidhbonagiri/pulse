@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/config"
-	"github.com/sreenidhbonagiri/pulse/backend/internal/monitoring"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/service"
 )
@@ -15,20 +15,16 @@ type Server struct {
 	checks   *service.MonitorCheckService
 }
 
-func NewServer(cfg config.Config, monitors repository.MonitorRepository, checkResults repository.CheckResultRepository) *Server {
-	return NewServerWithChecker(cfg, monitors, checkResults, monitoring.NewChecker(nil))
-}
-
-func NewServerWithChecker(
+func NewServer(
 	cfg config.Config,
 	monitors repository.MonitorRepository,
 	checkResults repository.CheckResultRepository,
-	checker service.HTTPChecker,
+	publisher queue.Publisher,
 ) *Server {
 	return &Server{
 		addr:     cfg.Addr,
 		monitors: monitors,
-		checks:   service.NewMonitorCheckService(monitors, checkResults, checker),
+		checks:   service.NewMonitorCheckService(monitors, checkResults, nil, publisher),
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
 )
 
@@ -22,7 +23,7 @@ func TestRunCheckSuccess(t *testing.T) {
 		CheckedAt:      time.Now().UTC(),
 	}}
 	results := newMemoryCheckResults()
-	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, checker)
+	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, checker, nil)
 
 	got, err := svc.RunCheck(context.Background(), monitor.ID)
 	if err != nil {
@@ -43,7 +44,7 @@ func TestRunCheckSuccess(t *testing.T) {
 }
 
 func TestRunCheckUnknownMonitor(t *testing.T) {
-	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{})
+	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{}, nil)
 
 	_, err := svc.RunCheck(context.Background(), uuid.New())
 	if !errors.Is(err, repository.ErrNotFound) {
@@ -54,7 +55,7 @@ func TestRunCheckUnknownMonitor(t *testing.T) {
 func TestListChecksNewestFirst(t *testing.T) {
 	monitor := storedMonitor()
 	results := newMemoryCheckResults()
-	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, stubChecker{})
+	svc := NewMonitorCheckService(newMemoryMonitors(monitor), results, stubChecker{}, nil)
 
 	older := models.CheckResult{MonitorID: monitor.ID, ResponseTimeMs: 1, CheckedAt: time.Now().UTC().Add(-time.Minute)}
 	newer := models.CheckResult{MonitorID: monitor.ID, ResponseTimeMs: 2, CheckedAt: time.Now().UTC()}
@@ -71,11 +72,41 @@ func TestListChecksNewestFirst(t *testing.T) {
 }
 
 func TestListChecksUnknownMonitor(t *testing.T) {
-	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{})
+	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), stubChecker{}, nil)
 
 	_, err := svc.ListChecks(context.Background(), uuid.New(), 10)
 	if !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestEnqueueCheck(t *testing.T) {
+	monitor := storedMonitor()
+	publisher := queue.NewMemoryPublisher()
+	svc := NewMonitorCheckService(newMemoryMonitors(monitor), newMemoryCheckResults(), nil, publisher)
+
+	job, err := svc.EnqueueCheck(context.Background(), monitor.ID)
+	if err != nil {
+		t.Fatalf("EnqueueCheck: %v", err)
+	}
+	if job.JobID == uuid.Nil || job.MonitorID != monitor.ID {
+		t.Fatalf("job = %+v", job)
+	}
+	if len(publisher.Jobs) != 1 || publisher.Jobs[0].JobID != job.JobID {
+		t.Fatalf("published jobs = %+v", publisher.Jobs)
+	}
+}
+
+func TestEnqueueCheckUnknownMonitor(t *testing.T) {
+	publisher := queue.NewMemoryPublisher()
+	svc := NewMonitorCheckService(newMemoryMonitors(), newMemoryCheckResults(), nil, publisher)
+
+	_, err := svc.EnqueueCheck(context.Background(), uuid.New())
+	if !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+	if len(publisher.Jobs) != 0 {
+		t.Fatal("should not publish a job for an unknown monitor")
 	}
 }
 

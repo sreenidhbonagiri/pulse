@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sreenidhbonagiri/pulse/backend/internal/models"
+	"github.com/sreenidhbonagiri/pulse/backend/internal/queue"
 	"github.com/sreenidhbonagiri/pulse/backend/internal/repository"
 )
 
@@ -14,23 +15,38 @@ type HTTPChecker interface {
 	Check(ctx context.Context, monitor models.Monitor) models.CheckResult
 }
 
-// MonitorCheckService loads a monitor, runs a check, and saves the result.
+// MonitorCheckService coordinates monitors, the queue, and saved check results.
 type MonitorCheckService struct {
 	monitors     repository.MonitorRepository
 	checkResults repository.CheckResultRepository
 	checker      HTTPChecker
+	publisher    queue.Publisher
 }
 
 func NewMonitorCheckService(
 	monitors repository.MonitorRepository,
 	checkResults repository.CheckResultRepository,
 	checker HTTPChecker,
+	publisher queue.Publisher,
 ) *MonitorCheckService {
 	return &MonitorCheckService{
 		monitors:     monitors,
 		checkResults: checkResults,
 		checker:      checker,
+		publisher:    publisher,
 	}
+}
+
+func (s *MonitorCheckService) EnqueueCheck(ctx context.Context, monitorID uuid.UUID) (*queue.MonitorCheckJob, error) {
+	if _, err := s.monitors.GetByID(ctx, monitorID); err != nil {
+		return nil, err
+	}
+
+	job := queue.NewMonitorCheckJob(monitorID)
+	if err := s.publisher.Publish(ctx, job); err != nil {
+		return nil, err
+	}
+	return &job, nil
 }
 
 func (s *MonitorCheckService) RunCheck(ctx context.Context, monitorID uuid.UUID) (*models.CheckResult, error) {
