@@ -6,9 +6,6 @@ locals {
   ecs_subnet_ids   = var.enable_nat_gateway ? module.networking.private_subnet_ids : module.networking.public_subnet_ids
   assign_public_ip = !var.enable_nat_gateway
 
-  # Amazon MQ belongs in private subnets. The default ECS broker uses public
-  # subnets (no NAT) so it can pull its image through the Internet Gateway.
-
 
   extra_cors = [
     for origin in split(",", var.cors_origins) : trimspace(origin)
@@ -138,12 +135,9 @@ module "ecs" {
   worker_memory               = var.worker_memory
   scheduler_cpu               = var.scheduler_cpu
   scheduler_memory            = var.scheduler_memory
-  log_group_names = {
-    for name, group in module.observability.log_group_names : name => group
-    if name != "rabbitmq"
-  }
-  database_url_parameter_arn = aws_ssm_parameter.database_url.arn
-  redis_url_parameter_arn    = aws_ssm_parameter.redis_url.arn
+  log_group_names             = module.observability.log_group_names
+  database_url_parameter_arn  = aws_ssm_parameter.database_url.arn
+  redis_url_parameter_arn     = aws_ssm_parameter.redis_url.arn
 
   sqs_queue_url = aws_sqs_queue.monitor_checks.url
   sqs_dlq_url   = aws_sqs_queue.monitor_checks_dlq.url

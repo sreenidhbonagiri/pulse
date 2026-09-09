@@ -1,146 +1,683 @@
-# Pulse
+# # Pulse
 
-A distributed uptime and API monitoring platform.
+A distributed uptime and API monitoring platform built with Go, React, PostgreSQL, Amazon SQS, and AWS.
 
-## Quick start
+**Live demo:** [https://d1qd5as77atru7.cloudfront.net](https://d1qd5as77atru7.cloudfront.net)
 
-**PostgreSQL, RabbitMQ, and Redis**
+## Overview
 
-```bash
+Pulse continuously checks websites and APIs, records availability and latency, tracks incidents, and displays historical monitoring data through a live dashboard.
+
+The project is designed around a distributed backend architecture with separate API, scheduler, and worker services.
+
+## Architecture
+
+```text
+
+React Dashboard
+
+      |
+
+      v
+
+S3 + CloudFront
+
+      |
+
+      v
+
+Application Load Balancer
+
+      |
+
+      v
+
+ECS Fargate API
+
+      |
+
+      +----------------------+
+
+      |                      |
+
+      v                      v
+
+RDS PostgreSQL          Amazon SQS
+
+                              |
+
+                              v
+
+                         ECS Worker
+
+                              |
+
+                              v
+
+                         HTTP Checks
+
+ECS Scheduler
+
+      |
+
+      v
+
+Amazon SQS
+
+
+
+## Features
+
+- Website and API uptime monitoring
+- Configurable check intervals and timeouts
+- HTTP status validation
+- Latency tracking
+- Historical check results
+- Incident detection and resolution
+- Automatic background scheduling
+- Distributed job processing
+- Retry handling with delayed messages
+- Dead-letter queue support
+- Idempotent job processing
+- PostgreSQL persistence
+- Optional Redis statistics caching
+- Prometheus metrics
+- Grafana dashboard
+- Dockerized services
+- AWS infrastructure managed with Terraform
+- Automated frontend and backend deployment with GitHub Actions
+
+## Tech stack
+
+### Frontend
+
+- React
+- TypeScript
+- Vite
+
+### Backend
+
+- Go
+- REST API
+- PostgreSQL
+- Amazon SQS
+- RabbitMQ for local development
+- Redis for optional statistics caching
+
+### Infrastructure
+
+- AWS ECS Fargate
+- Amazon RDS
+- Amazon SQS
+- Amazon ECR
+- Amazon S3
+- Amazon CloudFront
+- Application Load Balancer
+- CloudWatch
+- SSM Parameter Store
+- Terraform
+- Docker
+- GitHub Actions
+
+### Observability
+
+- Prometheus
+- Grafana
+- CloudWatch Logs
+
+## Local development
+
+Pulse uses PostgreSQL, RabbitMQ, and Redis for local development.
+
+Start the local infrastructure:
+
+```
+
+```
+
+```
 cp .env.example .env
 docker compose up -d
 ```
 
-RabbitMQ management UI: [http://localhost:15672](http://localhost:15672) (user `guest`, password `guest`).
-Redis is used only to cache monitor statistics. The API still works if Redis is down.
+RabbitMQ management UI:
 
-**Frontend**
-
-```bash
-cd frontend
-cp .env.example .env
-npm install
-npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). The dashboard talks to the API using `VITE_API_BASE_URL` (default `http://localhost:8080`).
+```
 
-**Run frontend and backend together**
+```
+http://localhost:15672
+```
 
-1. Start Postgres, RabbitMQ, and Redis: `docker compose up -d`
-2. Start the API: `cd backend && go run ./cmd/api`
-3. Start the worker and scheduler in other terminals (`go run ./cmd/worker`, `go run ./cmd/scheduler`) so checks actually run
-4. Start the dashboard: `cd frontend && npm run dev`
-5. Open [http://localhost:5173](http://localhost:5173)
+Default credentials:
 
-The API allows those browser origins through `CORS_ORIGINS` (default `http://localhost:5173,http://127.0.0.1:5173`). Restart the API after changing that variable.
+```
 
-**Backend** (requires [Go](https://go.dev/doc/install), PostgreSQL, and RabbitMQ. Redis is optional.)
+```
 
-API:
+```
+guest / guest
+```
 
-```bash
+Redis is optional for statistics caching. If Redis is unavailable, Pulse falls back to PostgreSQL.
+
+## Run the backend
+
+### API
+
+```
+
+```
+
+```
 cd backend
 go run ./cmd/api
 ```
 
-Worker (separate terminal):
+### Worker
 
-```bash
+In another terminal:
+
+```
+
+```
+
+```
 cd backend
 go run ./cmd/worker
 ```
 
-Scheduler (separate terminal):
+### Scheduler
 
-```bash
+In another terminal:
+
+```
+
+```
+
+```
 cd backend
 go run ./cmd/scheduler
 ```
 
 Health check:
 
-```bash
+```
+
+```
+
+```
 curl http://localhost:8080/health
 ```
 
-**Observability (Prometheus + Grafana)**
+## Run the frontend
 
-```bash
-docker compose up -d
 ```
 
-Prometheus scrapes the Go processes on the host through `host.docker.internal`:
+```
 
-- API: [http://localhost:8080/metrics](http://localhost:8080/metrics)
-- Worker: [http://localhost:8081/metrics](http://localhost:8081/metrics)
-- Scheduler: [http://localhost:8082/metrics](http://localhost:8082/metrics)
+```
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
 
-Open Prometheus at [http://localhost:9090](http://localhost:9090) and Grafana at [http://localhost:3000](http://localhost:3000) (anonymous viewer, or `admin` / `admin`). The Pulse dashboard and Prometheus datasource are provisioned from `monitoring/`.
+Open:
 
-If Prometheus or Grafana is down, the API, worker, and scheduler keep running.
+```
 
-**Monitors API**
+```
 
-```bash
+```
+http://localhost:5173
+```
+
+The frontend communicates with the API using:
+
+```
+
+```
+
+```
+VITE_API_BASE_URL
+```
+
+The default local API URL is:
+
+```
+
+```
+
+```
+http://localhost:8080
+```
+
+## Queue providers
+
+Pulse supports multiple queue backends through a shared queue abstraction.
+
+For local development:
+
+```
+
+```
+
+```
+QUEUE_PROVIDER=rabbitmq
+```
+
+For AWS:
+
+```
+
+```
+
+```
+QUEUE_PROVIDER=sqs
+```
+
+The API, scheduler, and worker use the same job model regardless of the queue provider.
+
+## Monitoring flow
+
+The monitoring pipeline works like this:
+
+```
+
+```
+
+```
+Scheduler
+   |
+   v
+Queue
+   |
+   v
+Worker
+   |
+   v
+HTTP Request
+   |
+   v
+Check Result
+   |
+   v
+PostgreSQL
+```
+
+The scheduler finds monitors whose next check is due and publishes jobs to the queue.
+
+Workers consume those jobs, perform HTTP requests, measure latency, determine success or failure, and save the result.
+
+## Monitors API
+
+Create a monitor:
+
+```
+
+```
+
+```
 curl -X POST http://localhost:8080/api/monitors \
   -H "Content-Type: application/json" \
-  -d '{"name":"My API","url":"https://example.com/health","http_method":"GET","check_interval_seconds":60,"timeout_seconds":5,"expected_status_code":200}'
+  -d '{
+    "name":"My API",
+    "url":"https://example.com/health",
+    "http_method":"GET",
+    "check_interval_seconds":60,
+    "timeout_seconds":5,
+    "expected_status_code":200
+  }'
+```
 
+List monitors:
+
+```
+
+```
+
+```
 curl http://localhost:8080/api/monitors
 ```
 
-**Enqueue a check** (the worker performs it in the background)
+Run a manual check:
 
-```bash
+```
+
+```
+
+```
 curl -X POST http://localhost:8080/api/monitors/MONITOR_ID/check
-curl -s http://localhost:8080/api/monitors/MONITOR_ID/checks
-curl -s http://localhost:8080/api/monitors/MONITOR_ID/incidents
-curl -s http://localhost:8080/api/monitors/MONITOR_ID/incidents/active
-curl -s http://localhost:8080/api/monitors/MONITOR_ID/stats
+```
+
+View check history:
+
+```
+
+```
+
+```
+curl http://localhost:8080/api/monitors/MONITOR_ID/checks
+```
+
+View incidents:
+
+```
+
+```
+
+```
+curl http://localhost:8080/api/monitors/MONITOR_ID/incidents
+```
+
+View active incident:
+
+```
+
+```
+
+```
+curl http://localhost:8080/api/monitors/MONITOR_ID/incidents/active
+```
+
+View statistics:
+
+```
+
+```
+
+```
+curl http://localhost:8080/api/monitors/MONITOR_ID/stats
 ```
 
 ## Monitor statistics
 
-`GET /api/monitors/{id}/stats` returns current status, uptime, latency percentiles, check counts, and incident summary.
+Pulse tracks:
 
-- Check totals, uptime, and latency use the **last 24 hours**
-- `current_status` is the latest check overall (`up`, `down`, or `unknown`)
-- `active_incident` is the current open incident, if any
-- Results are cached in Redis for 45 seconds (cache-aside)
-- A new check or incident change deletes that monitor's cache entry
+-  current status 
+-  uptime percentage 
+-  average latency 
+-  latency percentiles 
+-  total checks 
+-  failed checks 
+-  incident count 
+-  active incident state 
+
+Statistics use recent monitoring history stored in PostgreSQL.
+
+Redis can optionally cache statistics for faster reads.
+
+The current AWS deployment does not run ElastiCache and falls back directly to PostgreSQL.
 
 ## Incidents
 
-Pulse opens an incident after **3 consecutive failed checks** and resolves it after **2 consecutive successful checks**. Endpoint failures such as HTTP 500 count as failed checks. Internal Pulse errors still retry and do not open incidents by themselves.
+Pulse opens an incident after:
+
+```
+
+```
+
+```
+3 consecutive failed checks
+```
+
+An incident resolves after:
+
+```
+
+```
+
+```
+2 consecutive successful checks
+```
+
+Endpoint failures such as:
+
+-  HTTP 500 responses 
+-  DNS failures 
+-  timeouts 
+-  unexpected status codes 
+
+are stored as failed check results.
+
+Internal Pulse infrastructure failures are retried separately.
+
+## Retries and dead-letter queue
+
+Internal worker failures are retried automatically.
+
+The retry flow is:
+
+```
+
+```
+
+```
+Attempt 1
+   |
+   | failure
+   v
+2 second delay
+   |
+   v
+Attempt 2
+   |
+   | failure
+   v
+8 second delay
+   |
+   v
+Attempt 3
+   |
+   | failure
+   v
+Dead-letter queue
+```
+
+Jobs preserve the same `job_id` across retries.
+
+The database enforces idempotency so duplicate deliveries cannot create duplicate check results for the same job.
+
+In AWS, retry delays are implemented with Amazon SQS delayed messages.
+
+For local RabbitMQ development, retry queues use TTL-based delays.
+
+## Observability
+
+Pulse exposes Prometheus metrics from each Go process:
+
+```
+
+```
+
+```
+API       http://localhost:8080/metrics
+Worker    http://localhost:8081/metrics
+Scheduler http://localhost:8082/metrics
+```
+
+Start Prometheus and Grafana with:
+
+```
+
+```
+
+```
+docker compose up -d
+```
+
+Prometheus:
+
+```
+
+```
+
+```
+http://localhost:9090
+```
+
+Grafana:
+
+```
+
+```
+
+```
+http://localhost:3000
+```
+
+AWS currently uses CloudWatch Logs for production logging.
+
+Prometheus and Grafana remain local-only.
 
 ## Tests
 
-From `backend/`:
+From the backend directory:
 
-```bash
+```
+
+```
+
+```
+cd backend
 go test ./...
 go build ./...
 ```
 
-Postgres-backed tests skip automatically if `DATABASE_URL` is unreachable. Redis cache tests skip if `REDIS_URL` is unreachable.
+Some PostgreSQL-backed tests skip automatically if `DATABASE_URL` is unavailable.
 
-## Retries and dead-letter queue
+Redis cache tests skip if `REDIS_URL` is unavailable.
 
-Internal worker failures (for example PostgreSQL unavailable) retry through RabbitMQ, not `time.Sleep`. Endpoint failures such as HTTP 500, timeouts, or DNS errors are saved as normal `CheckResult` rows and are not retried.
+## AWS deployment
 
-Topology (declared on API, worker, and scheduler startup):
+Infrastructure is managed with Terraform:
 
-- exchange `pulse.jobs` (direct, durable)
-- queue `monitor.checks` (workers consume this)
-- queue `monitor.checks.retry.1` (TTL 2s, dead-letters back to `monitor.checks`)
-- queue `monitor.checks.retry.2` (TTL 8s, dead-letters back to `monitor.checks`)
-- queue `monitor.checks.dlq` (not consumed by the worker)
-
-A job keeps the same `job_id` across retries. After 3 failed attempts it is published to `monitor.checks.dlq`. Duplicate deliveries cannot insert a second `CheckResult` for the same `job_id`.
-
-**Inspect queues** in the [RabbitMQ management UI](http://localhost:15672) or with:
-
-```bash
-docker compose exec rabbitmq rabbitmqctl list_queues name messages
 ```
+
+```
+
+```
+infrastructure/terraform/
+```
+
+The production deployment includes:
+
+-  ECS Fargate API 
+-  ECS Fargate worker 
+-  ECS Fargate scheduler 
+-  Amazon SQS 
+-  RDS PostgreSQL 
+-  Application Load Balancer 
+-  S3 
+-  CloudFront 
+-  ECR 
+-  CloudWatch 
+-  SSM Parameter Store 
+
+The deployment intentionally does not use a NAT Gateway.
+
+Redis/ElastiCache and Amazon MQ were removed from the always-on AWS architecture to reduce cost.
+
+See:
+
+- Deployment Guide 
+- AWS Cost Notes 
+
+## CI/CD
+
+Pulse uses GitHub Actions for automated deployment.
+
+### Backend
+
+Changes to backend files on `main` trigger:
+
+```
+
+```
+
+```
+.github/workflows/deploy-backend.yml
+```
+
+The workflow:
+
+1.  runs Go tests 
+2.  authenticates to AWS using GitHub OIDC 
+3.  builds the API, worker, and scheduler Docker images 
+4.  pushes the images to Amazon ECR 
+5.  redeploys the three ECS services 
+
+### Frontend
+
+Changes to frontend files on `main` trigger:
+
+```
+
+```
+
+```
+.github/workflows/deploy-frontend.yml
+```
+
+The workflow:
+
+1.  installs frontend dependencies 
+2.  builds the React application 
+3.  authenticates to AWS using OIDC 
+4.  uploads the build to S3 
+5.  invalidates CloudFront 
+
+No long-lived AWS access keys are stored in GitHub.
+
+## Terraform
+
+Before applying infrastructure changes:
+
+```
+
+```
+
+```
+cd infrastructure/terraform
+terraform fmt -recursive
+terraform init
+terraform validate
+terraform plan
+```
+
+Review the plan before running:
+
+```
+
+```
+
+```
+terraform apply
+```
+
+Terraform state and local variable files are ignored by Git and should never be committed.
+
+## Live deployment
+
+Dashboard:
+
+```
+
+```
+
+```
+https://d1qd5as77atru7.cloudfront.net
+```
+
+API requests are proxied through the same CloudFront domain:
+
+```
+
+```
+
+```
+https://d1qd5as77atru7.cloudfront.net/api/*
+```
+
