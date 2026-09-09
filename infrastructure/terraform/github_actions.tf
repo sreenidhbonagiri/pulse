@@ -88,6 +88,40 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         ]
 
         Resource = "*"
+      },
+
+      {
+        Sid    = "FrontendS3Deploy"
+        Effect = "Allow"
+
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
+        ]
+
+        Resource = "arn:aws:s3:::pulse-dev-frontend-041915167571"
+      },
+      {
+        Sid    = "FrontendS3Objects"
+        Effect = "Allow"
+
+        Action = [
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:GetObject"
+        ]
+
+        Resource = "arn:aws:s3:::pulse-dev-frontend-041915167571/*"
+      },
+      {
+        Sid    = "CloudFrontInvalidation"
+        Effect = "Allow"
+
+        Action = [
+          "cloudfront:CreateInvalidation"
+        ]
+
+        Resource = "arn:aws:cloudfront::041915167571:distribution/E34IVBISNG4I2L"
       }
     ]
   })
