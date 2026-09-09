@@ -32,7 +32,7 @@ resource "aws_iam_role" "github_actions" {
           }
 
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:sreenidhbonagiri/pulse:ref:refs/heads/main"
+            "token.actions.githubusercontent.com:sub" = "repo:sreenidhbonagiri@67754320/pulse@1359548194:ref:refs/heads/main"
           }
         }
       }
