@@ -1,6 +1,6 @@
 # Pulse frontend
 
-React + TypeScript + Vite dashboard for the Pulse API.
+React + TypeScript + Vite frontend for Pulse. `/` is the product landing page. The live dashboard is at `/dashboard`.
 
 ```bash
 cp .env.example .env

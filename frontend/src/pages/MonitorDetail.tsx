@@ -100,7 +100,7 @@ export function MonitorDetailPage() {
     setActionError(null)
     try {
       await api.deleteMonitor(id)
-      navigate('/')
+      navigate('/dashboard')
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Could not delete monitor')
     }
@@ -119,7 +119,7 @@ export function MonitorDetailPage() {
       <div className="page-header">
         <div>
           <p className="eyebrow">
-            <Link to="/">Dashboard</Link> / {monitor.http_method}
+            <Link to="/dashboard">Dashboard</Link> / {monitor.http_method}
           </p>
           <h1>{monitor.name}</h1>
           <p className="muted url">{monitor.url}</p>
@@ -254,11 +254,18 @@ export function MonitorDetailPage() {
           <div className="chart">
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={chartData}>
-                <CartesianGrid stroke="#e4dcd0" strokeDasharray="4 4" />
-                <XAxis dataKey="time" tick={{ fill: '#6b645c', fontSize: 12 }} />
-                <YAxis tick={{ fill: '#6b645c', fontSize: 12 }} unit="ms" />
-                <Tooltip />
-                <Line type="monotone" dataKey="latency" stroke="#0b6e63" strokeWidth={2} dot={false} />
+                <CartesianGrid stroke="rgba(243, 239, 230, 0.1)" strokeDasharray="4 4" />
+                <XAxis dataKey="time" tick={{ fill: '#9aa39e', fontSize: 12 }} />
+                <YAxis tick={{ fill: '#9aa39e', fontSize: 12 }} unit="ms" />
+                <Tooltip
+                  contentStyle={{
+                    background: '#1b2421',
+                    border: '1px solid rgba(243, 239, 230, 0.1)',
+                    borderRadius: 12,
+                    color: '#f3efe6',
+                  }}
+                />
+                <Line type="monotone" dataKey="latency" stroke="#5ee0c8" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

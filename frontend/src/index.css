@@ -1,18 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560&family=Outfit:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560&family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg: #f3efe6;
-  --paper: #fffcf7;
-  --ink: #1a1714;
-  --muted: #6b645c;
-  --line: #e4dcd0;
-  --accent: #0b6e63;
-  --accent-soft: #d7efe9;
-  --up: #1f7a4d;
-  --down: #b42318;
-  --unknown: #7a7268;
-  --incident: #9a3412;
-  --shadow: 0 16px 40px rgba(26, 23, 20, 0.08);
+  --bg: #0c100f;
+  --paper: #141a18;
+  --elevated: #1b2421;
+  --ink: #f3efe6;
+  --muted: #9aa39e;
+  --line: rgba(243, 239, 230, 0.1);
+  --accent: #5ee0c8;
+  --accent-deep: #0b6e63;
+  --accent-soft: rgba(94, 224, 200, 0.16);
+  --up: #8fe0b2;
+  --down: #f0a8a0;
+  --unknown: #9aa39e;
+  --incident: #f0c49a;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  color-scheme: dark;
   font-family: Outfit, system-ui, sans-serif;
   color: var(--ink);
   background: var(--bg);
@@ -26,10 +29,17 @@
   box-sizing: border-box;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 html,
 body,
 #root {
   min-height: 100%;
+  background: var(--bg);
 }
 
 body {

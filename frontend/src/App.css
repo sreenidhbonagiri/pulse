@@ -2,12 +2,15 @@
   display: grid;
   grid-template-columns: 240px 1fr;
   min-height: 100vh;
+  background:
+    radial-gradient(900px 480px at 0% -10%, rgba(11, 110, 99, 0.22), transparent 55%),
+    var(--bg);
 }
 
 .sidebar {
   padding: 28px 20px;
   border-right: 1px solid var(--line);
-  background: #efe8db;
+  background: rgba(20, 26, 24, 0.72);
 }
 
 .brand {
@@ -15,6 +18,11 @@
   gap: 12px;
   align-items: center;
   margin-bottom: 32px;
+}
+
+.brand-link {
+  text-decoration: none;
+  color: inherit;
 }
 
 .brand-mark {
@@ -32,19 +40,25 @@
 
 .brand-tag,
 .muted,
-.eyebrow,
 .stat-label,
 .stat-hint {
   color: var(--muted);
 }
 
 .brand-tag,
-.eyebrow,
 .stat-label {
   margin: 0;
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .nav,
@@ -68,9 +82,11 @@
 }
 
 .nav a.active,
+.top-link.active,
 .button {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--accent);
+  color: #07110f;
+  font-weight: 600;
 }
 
 .topbar {
@@ -125,6 +141,15 @@
   border: 1px solid var(--line);
   border-radius: 20px;
   box-shadow: var(--shadow);
+}
+
+.monitor-card {
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.monitor-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(94, 224, 200, 0.28);
 }
 
 .stat-card,
@@ -193,23 +218,23 @@
 }
 
 .badge-up {
-  background: #e5f6ea;
+  background: rgba(31, 122, 77, 0.22);
   color: var(--up);
 }
 
 .badge-down {
-  background: #fde8e4;
+  background: rgba(180, 35, 24, 0.22);
   color: var(--down);
 }
 
 .badge-unknown {
-  background: #efece6;
+  background: rgba(243, 239, 230, 0.08);
   color: var(--unknown);
 }
 
 .incident-chip,
 .incident-banner {
-  background: #ffedd5;
+  background: rgba(154, 52, 18, 0.28);
   color: var(--incident);
 }
 
@@ -231,7 +256,8 @@
 }
 
 .button.danger {
-  background: var(--down);
+  background: #b42318;
+  color: var(--ink);
 }
 
 .button:disabled {
@@ -270,7 +296,8 @@ input,
 select {
   width: 100%;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--elevated);
+  color: var(--ink);
   border-radius: 12px;
   padding: 10px 12px;
 }
@@ -342,7 +369,7 @@ td {
     flex-direction: row;
     padding: 12px 16px;
     border-bottom: 1px solid var(--line);
-    background: #efe8db;
+    background: rgba(20, 26, 24, 0.92);
   }
 
   .content {
