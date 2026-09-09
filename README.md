@@ -13,7 +13,7 @@ The project is designed around a distributed backend architecture with separate 
 ## Architecture
 
 ```text
-React Dashboard
+React Frontend
       |
       v
 S3 + CloudFront
@@ -496,10 +496,16 @@ Terraform state and local variable files are ignored by Git and should never be 
 
 ## Live Deployment
 
-Dashboard:
+Live site:
 
 ```text
 https://d1qd5as77atru7.cloudfront.net
+```
+
+Dashboard:
+
+```text
+https://d1qd5as77atru7.cloudfront.net/dashboard
 ```
 
 API requests are proxied through the same CloudFront domain:
