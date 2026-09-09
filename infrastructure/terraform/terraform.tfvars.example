@@ -9,10 +9,9 @@ image_tag    = "latest"
 api_desired_count       = 1
 worker_desired_count    = 1
 scheduler_desired_count = 1
-rabbitmq_desired_count  = 1
 
 # Keep false unless you explicitly want private ECS tasks. NAT Gateway is expensive.
 enable_nat_gateway = false
 
 enable_redis    = true
-rabbitmq_engine = "ecs"
+

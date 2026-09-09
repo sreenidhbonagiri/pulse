@@ -46,24 +46,6 @@ variable "scheduler_desired_count" {
   default     = 1
 }
 
-variable "rabbitmq_desired_count" {
-  description = "Desired RabbitMQ Fargate tasks. Default 1 so the broker actually runs. Set to 0 to stop RabbitMQ and save Fargate cost when not demoing."
-  type        = number
-  default     = 1
-}
-
-variable "rabbitmq_cpu" {
-  description = "Fargate CPU units for the ECS RabbitMQ task (256 = 0.25 vCPU)."
-  type        = number
-  default     = 256
-}
-
-variable "rabbitmq_memory" {
-  description = "Fargate memory (MiB) for the ECS RabbitMQ task."
-  type        = number
-  default     = 512
-}
-
 variable "api_cpu" {
   type    = number
   default = 256
@@ -106,16 +88,6 @@ variable "enable_redis" {
   default     = true
 }
 
-variable "rabbitmq_engine" {
-  description = "RabbitMQ hosting: ecs (cheaper, default) or amazonmq (managed, higher cost)."
-  type        = string
-  default     = "ecs"
-
-  validation {
-    condition     = contains(["ecs", "amazonmq"], var.rabbitmq_engine)
-    error_message = "rabbitmq_engine must be ecs or amazonmq."
-  }
-}
 
 variable "db_instance_class" {
   type    = string

@@ -151,7 +151,7 @@ resource "aws_security_group" "api" {
   }
 
   egress {
-    description = "RDS, Redis, RabbitMQ, and outbound monitor checks"
+    description = "RDS, Redis, and outbound monitor checks"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -165,7 +165,7 @@ resource "aws_security_group" "worker" {
   vpc_id      = aws_vpc.this.id
 
   egress {
-    description = "RDS, Redis, RabbitMQ, and outbound monitor checks"
+    description = "RDS, Redis, and outbound monitor checks"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
