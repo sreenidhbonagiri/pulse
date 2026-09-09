@@ -1,0 +1,8 @@
+# Local build artifacts
+*.exe
+*.test
+*.out
+coverage.*
+.git
+.gitignore
+**/*_test.go

@@ -11,6 +11,9 @@ type Config struct {
 	Addr                 string
 	DatabaseURL          string
 	RabbitMQURL          string
+	QueueProvider        string
+	SQSQueueURL          string
+	SQSDLQURL            string
 	RedisURL             string
 	CORSOrigins          string
 	WorkerMetricsAddr    string
@@ -26,6 +29,9 @@ func Load() Config {
 		Addr:                 env("API_ADDR", ":8080"),
 		DatabaseURL:          env("DATABASE_URL", "postgres://pulse:pulse@localhost:5432/pulse?sslmode=disable"),
 		RabbitMQURL:          env("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
+		QueueProvider:        env("QUEUE_PROVIDER", "rabbitmq"),
+		SQSQueueURL:          env("SQS_QUEUE_URL", ""),
+		SQSDLQURL:            env("SQS_DLQ_URL", ""),
 		RedisURL:             env("REDIS_URL", "redis://localhost:6379/0"),
 		CORSOrigins:          env("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"),
 		WorkerMetricsAddr:    env("WORKER_METRICS_ADDR", ":8081"),

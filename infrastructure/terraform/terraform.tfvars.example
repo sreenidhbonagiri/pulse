@@ -1,0 +1,18 @@
+aws_region   = "us-east-1"
+environment  = "dev"
+image_tag    = "latest"
+
+# Extra browser origins allowed by the API, in addition to CloudFront HTTPS.
+# cors_origins = "http://localhost:5173"
+
+# Dev demo defaults: one task each. Set these to 0 when you are not demoing.
+api_desired_count       = 1
+worker_desired_count    = 1
+scheduler_desired_count = 1
+rabbitmq_desired_count  = 1
+
+# Keep false unless you explicitly want private ECS tasks. NAT Gateway is expensive.
+enable_nat_gateway = false
+
+enable_redis    = true
+rabbitmq_engine = "ecs"

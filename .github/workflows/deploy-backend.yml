@@ -1,0 +1,91 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Run backend tests
+        working-directory: backend
+        run: go test ./...
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::041915167571:role/pulse-dev-github-actions
+          aws-region: us-east-1
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f backend/Dockerfile.api \
+            -t 041915167571.dkr.ecr.us-east-1.amazonaws.com/pulse-dev/api:latest \
+            backend
+
+          docker push 041915167571.dkr.ecr.us-east-1.amazonaws.com/pulse-dev/api:latest
+
+      - name: Build and push worker
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f backend/Dockerfile.worker \
+            -t 041915167571.dkr.ecr.us-east-1.amazonaws.com/pulse-dev/worker:latest \
+            backend
+
+          docker push 041915167571.dkr.ecr.us-east-1.amazonaws.com/pulse-dev/worker:latest
+
+      - name: Build and push scheduler
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f backend/Dockerfile.scheduler \
+            -t 041915167571.dkr.ecr.us-east-1.amazonaws.com/pulse-dev/scheduler:latest \
+            backend
+
+          docker push 041915167571.dkr.ecr.us-east-1.amazonaws.com/pulse-dev/scheduler:latest
+
+      - name: Redeploy API
+        run: |
+          aws ecs update-service \
+            --cluster pulse-dev \
+            --service pulse-dev-api \
+            --force-new-deployment
+
+      - name: Redeploy worker
+        run: |
+          aws ecs update-service \
+            --cluster pulse-dev \
+            --service pulse-dev-worker \
+            --force-new-deployment
+
+      - name: Redeploy scheduler
+        run: |
+          aws ecs update-service \
+            --cluster pulse-dev \
+            --service pulse-dev-scheduler \
+            --force-new-deployment

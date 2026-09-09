@@ -36,11 +36,16 @@ func main() {
 		log.Fatalf("database migrations: %v", err)
 	}
 
-	rmq, err := queue.Dial(cfg.RabbitMQURL)
+	q, err := queue.New(ctx, queue.Config{
+		Provider:    cfg.QueueProvider,
+		RabbitMQURL: cfg.RabbitMQURL,
+		SQSQueueURL: cfg.SQSQueueURL,
+		SQSDLQURL:   cfg.SQSDLQURL,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer rmq.Close()
+	defer q.Close()
 
 	checkResults := repository.NewPostgresCheckResultRepository(pool)
 	incidentRepo := repository.NewPostgresIncidentRepository(pool)
@@ -74,7 +79,7 @@ func main() {
 	}
 
 	log.Printf("Pulse worker listening on queue %s", queue.MonitorChecksQueue)
-	if err := rmq.Consume(ctx, worker.New(checks).HandleJob); err != nil {
+	if err := q.Consume(ctx, worker.New(checks).HandleJob); err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("Pulse worker stopped")

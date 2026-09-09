@@ -14,8 +14,7 @@ func StartServer(ctx context.Context, addr string, m *Metrics) {
 		return
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("GET /metrics", MetricsHandler(m))
+	mux := AdminMux(m)
 
 	srv := &http.Server{
 		Addr:              addr,
@@ -31,7 +30,7 @@ func StartServer(ctx context.Context, addr string, m *Metrics) {
 	}()
 
 	go func() {
-		log.Printf("metrics listening on %s", addr)
+		log.Printf("metrics and health listening on %s", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("metrics server unavailable (Pulse will keep running): %v", err)
 		}

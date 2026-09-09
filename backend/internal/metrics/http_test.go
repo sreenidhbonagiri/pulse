@@ -64,6 +64,16 @@ func TestHTTPMiddlewareRecordsNormalizedRoute(t *testing.T) {
 	}
 }
 
+func TestAdminMuxHealth(t *testing.T) {
+	m := New("worker")
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	AdminMux(m).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
 func TestHTTPMiddlewareSkipsMetricsPath(t *testing.T) {
 	m := New("api")
 	mux := http.NewServeMux()

@@ -33,14 +33,19 @@ func main() {
 		log.Fatalf("database migrations: %v", err)
 	}
 
-	rmq, err := queue.Dial(cfg.RabbitMQURL)
+	q, err := queue.New(ctx, queue.Config{
+		Provider:    cfg.QueueProvider,
+		RabbitMQURL: cfg.RabbitMQURL,
+		SQSQueueURL: cfg.SQSQueueURL,
+		SQSDLQURL:   cfg.SQSDLQURL,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer rmq.Close()
+	defer q.Close()
 
 	log.Printf("Pulse scheduler polling every %s", scheduler.DefaultPollInterval)
-	if err := scheduler.New(repository.NewPostgresMonitorRepository(pool), rmq).Run(ctx); err != nil {
+	if err := scheduler.New(repository.NewPostgresMonitorRepository(pool), q).Run(ctx); err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("Pulse scheduler stopped")

@@ -28,11 +28,16 @@ func main() {
 		log.Fatalf("database migrations: %v", err)
 	}
 
-	rmq, err := queue.Dial(cfg.RabbitMQURL)
+	q, err := queue.New(ctx, queue.Config{
+		Provider:    cfg.QueueProvider,
+		RabbitMQURL: cfg.RabbitMQURL,
+		SQSQueueURL: cfg.SQSQueueURL,
+		SQSDLQURL:   cfg.SQSDLQURL,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer rmq.Close()
+	defer q.Close()
 
 	statsCache, err := cache.Dial(ctx, cfg.RedisURL)
 	if err != nil {
@@ -45,7 +50,7 @@ func main() {
 	monitorRepo := repository.NewPostgresMonitorRepository(pool)
 	checkResultRepo := repository.NewPostgresCheckResultRepository(pool)
 	incidentRepo := repository.NewPostgresIncidentRepository(pool)
-	server := api.NewServer(cfg, monitorRepo, checkResultRepo, incidentRepo, rmq, statsCache)
+	server := api.NewServer(cfg, monitorRepo, checkResultRepo, incidentRepo, q, statsCache)
 
 	log.Printf("starting Pulse API on %s", cfg.Addr)
 	if err := server.Start(); err != nil {

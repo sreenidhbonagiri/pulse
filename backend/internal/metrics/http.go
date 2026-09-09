@@ -11,6 +11,18 @@ import (
 
 var uuidPath = regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
 
+// AdminMux serves GET /metrics and GET /health for a process.
+func AdminMux(m *Metrics) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", MetricsHandler(m))
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	return mux
+}
+
 // MetricsHandler serves GET /metrics from the process registry.
 func MetricsHandler(m *Metrics) http.Handler {
 	if m == nil || m.Gatherer() == nil {
